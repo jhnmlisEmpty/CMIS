@@ -7,6 +7,7 @@ use App\Livewire\SmallGroup\ManageMembers;
 use App\Livewire\SmallGroup\UpdateSmallGroup;
 use App\Livewire\SmallGroup\ViewLesson;
 use App\Livewire\SmallGroup\ViewSmallGroup;
+use App\Http\Controllers\MemberListExportController;
 use App\Livewire\User\CreateUser;
 use App\Livewire\User\IndexUser;
 use App\Livewire\User\UpdateUser;
@@ -56,6 +57,7 @@ Route::middleware('auth')->group(function () {
 
 // User/Member Management
 Route::get('/users', IndexUser::class)->name('users.index');
+Route::get('/users/export', MemberListExportController::class)->name('users.export');
 Route::get('/users/map', UserLocationsMap::class)->name('users.map');
 Route::get('/users/create', CreateUser::class)->name('users.create');
 Route::get('/users/{user}', ViewUser::class)->name('users.show');
