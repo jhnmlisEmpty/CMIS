@@ -16,6 +16,7 @@ use App\Livewire\Attendance\CreateEvent;
 use App\Livewire\Attendance\IndexEvent;
 use App\Livewire\Attendance\UpdateEvent;
 use App\Livewire\Attendance\ViewEvent;
+use App\Http\Controllers\MemberListExportController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -56,6 +57,7 @@ Route::middleware('auth')->group(function () {
 
 // User/Member Management
 Route::get('/users', IndexUser::class)->name('users.index');
+Route::get('/users/export', MemberListExportController::class)->name('users.export');
 Route::get('/users/map', UserLocationsMap::class)->name('users.map');
 Route::get('/users/create', CreateUser::class)->name('users.create');
 Route::get('/users/{user}', ViewUser::class)->name('users.show');
