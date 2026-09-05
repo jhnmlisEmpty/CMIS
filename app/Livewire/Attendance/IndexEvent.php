@@ -15,6 +15,7 @@ class IndexEvent extends Component
 {
     use WithPagination;
 
+    
     public string $search = '';
     public string $typeFilter = '';
     public string $sortBy = 'event_date';

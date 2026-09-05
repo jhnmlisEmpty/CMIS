@@ -7,6 +7,7 @@ use App\Livewire\SmallGroup\ManageMembers;
 use App\Livewire\SmallGroup\UpdateSmallGroup;
 use App\Livewire\SmallGroup\ViewLesson;
 use App\Livewire\SmallGroup\ViewSmallGroup;
+use App\Http\Controllers\MemberListExportController;
 use App\Livewire\User\CreateUser;
 use App\Livewire\User\IndexUser;
 use App\Livewire\User\UpdateUser;
