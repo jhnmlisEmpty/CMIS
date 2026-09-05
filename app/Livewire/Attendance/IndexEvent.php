@@ -1,3 +1,5 @@
+
+
 <?php
 
 namespace App\Livewire\Attendance;
@@ -14,8 +16,6 @@ use Livewire\WithPagination;
 class IndexEvent extends Component
 {
     use WithPagination;
-
-    
     public string $search = '';
     public string $typeFilter = '';
     public string $sortBy = 'event_date';
