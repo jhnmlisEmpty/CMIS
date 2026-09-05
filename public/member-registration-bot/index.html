@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#173f35">
+    <meta name="description" content="Register as a member of True Vine World Harvest Church - Pangasinan.">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+    <title>Member Registration Assistant | TVWHC Pangasinan</title>
+    <link rel="icon" type="image/png" href="/images/true-vine-logo.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+</head>
+<body>
+    <main class="registration-shell">
+        <section class="chat-panel" aria-labelledby="assistant-name">
+            <header class="chat-header">
+                <div>
+                    <img class="assistant-logo" src="/images/true-vine-logo.png" alt="True Vine World Harvest Church logo">
+                    <div class="assistant-copy"><h1 id="assistant-name">Registration assistant</h1><small id="assistant-status">Ready to help</small></div>
+                </div>
+                <div class="header-tools">
+                    <div class="language-switch" role="group" aria-label="Choose language">
+                        <button type="button" data-language="en" aria-pressed="true">English</button>
+                        <button type="button" data-language="fil" aria-pressed="false">Filipino</button>
+                    </div>
+                    <button id="restart-button" class="text-button" type="button" hidden>Start over</button>
+                </div>
+            </header>
+
+            <div class="progress" aria-label="Registration progress">
+                <span id="progress-bar"></span>
+            </div>
+
+            <div id="conversation" class="conversation" role="log" aria-live="polite" aria-relevant="additions"></div>
+
+            <div id="composer" class="composer"></div>
+        </section>
+    </main>
+
+    <template id="message-template">
+        <div class="message-row">
+            <span class="message-avatar" aria-hidden="true">TV</span>
+            <p class="message"></p>
+        </div>
+    </template>
+</body>
+</html>
