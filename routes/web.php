@@ -17,7 +17,6 @@ use App\Livewire\Attendance\CreateEvent;
 use App\Livewire\Attendance\IndexEvent;
 use App\Livewire\Attendance\UpdateEvent;
 use App\Livewire\Attendance\ViewEvent;
-use App\Http\Controllers\MemberListExportController;
 use App\Http\Controllers\Auth\LoginController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
