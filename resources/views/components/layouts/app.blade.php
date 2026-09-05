@@ -20,7 +20,7 @@
     <aside class="app-sidebar" aria-label="Primary navigation">
         <a href="{{ route('home') }}" class="brand-lockup" wire:navigate>
             <img src="{{ asset('images/true-vine-logo.png') }}" class="brand-logo" alt="True Vine World Harvest Church logo">
-            <span><strong>True Vine</strong><small>World Harvest Church · Pangasinan</small></span>
+            <span><strong>TVWHC Pangasinan</strong><small>Church Management System</small></span>
         </a>
         <nav class="desktop-nav">
             <p class="nav-section-label">Workspace</p>
@@ -46,7 +46,6 @@
                 </button>
             </form>
         </nav>
-        <div class="sidebar-note"><span class="sidebar-note-icon" aria-hidden="true">C</span><div><strong>Community care</strong><small>Keep people connected.</small></div></div>
     </aside>
     <header class="app-header">
         <div class="mobile-brand"><img src="{{ asset('images/true-vine-logo.png') }}" class="mobile-brand-logo" alt="True Vine World Harvest Church logo"><strong>True Vine World Harvest Church</strong></div>

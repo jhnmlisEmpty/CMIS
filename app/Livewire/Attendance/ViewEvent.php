@@ -4,7 +4,9 @@ namespace App\Livewire\Attendance;
 use Livewire\Component;
 use App\Models\Event;
 use App\Models\Attendance;
+use App\Models\SmallGroup;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 use Livewire\Attributes\Layout;
@@ -17,6 +19,14 @@ class ViewEvent extends Component
     public Event $event;
     public string $scannedUuid = '';
     public string $searchName = '';
+    public string $attendanceSearch = '';
+    public string $attendanceRoleFilter = '';
+    public string $attendanceSmallGroupFilter = '';
+    public string $attendanceLocationFilter = '';
+    public string $attendanceBirthdateFrom = '';
+    public string $attendanceBirthdateTo = '';
+    public string $attendanceMinAge = '';
+    public string $attendanceMaxAge = '';
     public string $message = '';
     public string $messageType = ''; // 'success' or 'error'
 
@@ -30,9 +40,7 @@ class ViewEvent extends Component
      */
     public function getAttendanceChartData()
     {
-        $attendances = $this->event->attendances()
-            ->with('user')
-            ->get();
+        $attendances = $this->getAttendances();
 
         // Group by minute
         $minuteData = [];
@@ -85,9 +93,38 @@ class ViewEvent extends Component
     /**
      * Get attendances for the event with small group information
      */
+    protected function attendanceAgeSqlExpression(): string
+    {
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            return "((CAST(strftime('%Y', 'now') AS INTEGER) - CAST(strftime('%Y', birthdate) AS INTEGER)) - (CASE WHEN strftime('%m-%d', 'now') < strftime('%m-%d', birthdate) THEN 1 ELSE 0 END))";
+        }
+
+        if ($driver === 'pgsql') {
+            return "(EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)))";
+        }
+
+        return "(TIMESTAMPDIFF(YEAR, birthdate, CURDATE()))";
+    }
+
+    public function clearAttendanceFilters(): void
+    {
+        $this->reset([
+            'attendanceSearch',
+            'attendanceRoleFilter',
+            'attendanceSmallGroupFilter',
+            'attendanceLocationFilter',
+            'attendanceBirthdateFrom',
+            'attendanceBirthdateTo',
+            'attendanceMinAge',
+            'attendanceMaxAge',
+        ]);
+    }
+
     public function getAttendances()
     {
-        return $this->event->attendances()
+        $query = $this->event->attendances()
             ->with([
                 'user',
                 'user.smallGroups' => function ($query) {
@@ -95,8 +132,48 @@ class ViewEvent extends Component
                         ->where('small_groups.status', 'active');
                 }
             ])
-            ->latest('check_in_time')
-            ->get();
+            ->whereHas('user', function ($userQuery) {
+                $userQuery->when($this->attendanceSearch !== '', function ($q) {
+                    $q->where(function ($inner) {
+                        $inner->where('name', 'like', '%' . $this->attendanceSearch . '%')
+                            ->orWhere('email', 'like', '%' . $this->attendanceSearch . '%')
+                            ->orWhere('phone', 'like', '%' . $this->attendanceSearch . '%')
+                            ->orWhere('address', 'like', '%' . $this->attendanceSearch . '%');
+                    });
+                })
+                    ->when($this->attendanceRoleFilter !== '', fn ($q) => $q->where('role', $this->attendanceRoleFilter))
+                    ->when($this->attendanceSmallGroupFilter !== '', function ($q) {
+                        $q->whereHas('smallGroups', function ($groupQuery) {
+                            $groupQuery->where('small_groups.id', $this->attendanceSmallGroupFilter)
+                                ->where('small_group_members.status', 'active');
+                        });
+                    })
+                    ->when($this->attendanceLocationFilter !== '', function ($q) {
+                        $q->where(function ($inner) {
+                            $inner->where('address', 'like', '%' . $this->attendanceLocationFilter . '%')
+                                ->orWhere('street_address', 'like', '%' . $this->attendanceLocationFilter . '%')
+                                ->orWhere('city_code', 'like', '%' . $this->attendanceLocationFilter . '%')
+                                ->orWhere('province_code', 'like', '%' . $this->attendanceLocationFilter . '%')
+                                ->orWhere('barangay_code', 'like', '%' . $this->attendanceLocationFilter . '%');
+                        });
+                    })
+                    ->when($this->attendanceBirthdateFrom !== '', fn ($q) => $q->whereDate('birthdate', '>=', $this->attendanceBirthdateFrom))
+                    ->when($this->attendanceBirthdateTo !== '', fn ($q) => $q->whereDate('birthdate', '<=', $this->attendanceBirthdateTo))
+                    ->when($this->attendanceMinAge !== '' || $this->attendanceMaxAge !== '', function ($q) {
+                        $q->whereNotNull('birthdate');
+
+                        if ($this->attendanceMinAge !== '') {
+                            $q->whereRaw($this->attendanceAgeSqlExpression() . ' >= ?', [(int) $this->attendanceMinAge]);
+                        }
+
+                        if ($this->attendanceMaxAge !== '') {
+                            $q->whereRaw($this->attendanceAgeSqlExpression() . ' <= ?', [(int) $this->attendanceMaxAge]);
+                        }
+                    });
+            })
+            ->latest('check_in_time');
+
+        return $query->get();
     }
 
     /**
@@ -225,6 +302,9 @@ class ViewEvent extends Component
     {
         return view('livewire.attendance.view-event', [
             'event' => $this->event,
+            'attendanceRoles' => User::ROLES,
+            'attendanceStatuses' => User::STATUSES,
+            'smallGroups' => SmallGroup::query()->active()->orderBy('name')->get(),
         ]);
     }
 }

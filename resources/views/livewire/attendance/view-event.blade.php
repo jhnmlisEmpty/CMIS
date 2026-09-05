@@ -150,6 +150,31 @@
             <p>{{ $attendances->count() }} {{ Str::plural('record', $attendances->count()) }}</p>
         </div>
 
+        <div class="event-attendance-filters">
+            <div class="member-filter-group event-attendance-filter-group">
+                <div class="member-filter-row member-filter-row-primary">
+                    <label class="event-search" for="attendance-member-search"><x-heroicon-o-magnifying-glass aria-hidden="true" /><span class="sr-only">Search checked-in members</span><input id="attendance-member-search" type="search" wire:model.live.debounce.300ms="attendanceSearch" placeholder="Search name, email, phone"></label>
+                    <label class="event-type-filter" for="attendance-role-filter"><span class="sr-only">Filter by role</span><select id="attendance-role-filter" wire:model.live="attendanceRoleFilter"><option value="">All roles</option>@foreach($attendanceRoles as $role)<option value="{{ $role }}">{{ ucwords(str_replace('_', ' ', $role)) }}</option>@endforeach</select><x-heroicon-o-chevron-down /></label>
+                    <label class="event-type-filter" for="attendance-small-group-filter"><span class="sr-only">Filter by small group</span><select id="attendance-small-group-filter" wire:model.live="attendanceSmallGroupFilter"><option value="">All small groups</option>@foreach($smallGroups as $smallGroup)<option value="{{ $smallGroup->id }}">{{ $smallGroup->name }}</option>@endforeach</select><x-heroicon-o-chevron-down /></label>
+                </div>
+                <div class="member-filter-row member-filter-row-secondary">
+                    <label class="event-search" for="attendance-location-filter"><x-heroicon-o-map-pin aria-hidden="true" /><span class="sr-only">Filter by location</span><input id="attendance-location-filter" type="text" wire:model.live.debounce.300ms="attendanceLocationFilter" placeholder="Location"></label>
+                    <label class="event-type-filter" for="attendance-birthdate-from"><span class="sr-only">Birthdate from</span><input id="attendance-birthdate-from" type="date" wire:model.live="attendanceBirthdateFrom"></label>
+                    <label class="event-type-filter" for="attendance-birthdate-to"><span class="sr-only">Birthdate to</span><input id="attendance-birthdate-to" type="date" wire:model.live="attendanceBirthdateTo"></label>
+                </div>
+                <div class="member-filter-row member-filter-row-age">
+                    <label class="event-type-filter" for="attendance-min-age"><span class="sr-only">Min age</span><input id="attendance-min-age" type="number" min="0" max="120" wire:model.live.debounce.300ms="attendanceMinAge" placeholder="Min age"></label>
+                    <label class="event-type-filter" for="attendance-max-age"><span class="sr-only">Max age</span><input id="attendance-max-age" type="number" min="0" max="120" wire:model.live.debounce.300ms="attendanceMaxAge" placeholder="Max age"></label>
+                </div>
+            </div>
+            @if($attendanceSearch || $attendanceRoleFilter || $attendanceSmallGroupFilter || $attendanceLocationFilter || $attendanceBirthdateFrom || $attendanceBirthdateTo || $attendanceMinAge || $attendanceMaxAge)
+                <div class="event-active-filter">
+                    <p>Showing checked-in members matching your filters</p>
+                    <button type="button" wire:click="clearAttendanceFilters">Clear filters</button>
+                </div>
+            @endif
+        </div>
+
         @if($attendances->count() > 0)
             <div class="event-attendance-table-wrap">
                 <table class="event-attendance-table">
@@ -175,8 +200,8 @@
         @else
             <div class="event-empty-state event-empty-compact">
                 <span class="event-empty-icon"><x-heroicon-o-user-plus aria-hidden="true" /></span>
-                <h3>No one has checked in yet</h3>
-                <p>Scan a QR code or search for a member above to record the first arrival.</p>
+                <h3>{{ $attendanceSearch || $attendanceRoleFilter || $attendanceSmallGroupFilter || $attendanceLocationFilter || $attendanceBirthdateFrom || $attendanceBirthdateTo || $attendanceMinAge || $attendanceMaxAge ? 'No matching checked-in members' : 'No one has checked in yet' }}</h3>
+                <p>{{ $attendanceSearch || $attendanceRoleFilter || $attendanceSmallGroupFilter || $attendanceLocationFilter || $attendanceBirthdateFrom || $attendanceBirthdateTo || $attendanceMinAge || $attendanceMaxAge ? 'Try another filter or clear the search to see all checked-in members.' : 'Scan a QR code or search for a member above to record the first arrival.' }}</p>
             </div>
         @endif
     </section>
