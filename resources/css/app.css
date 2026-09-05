@@ -302,7 +302,7 @@ main .font-mono, main [class*='text-2xl'], main [class*='text-3xl'] { font-varia
 .event-member-cell strong, .event-member-cell small, .event-attendance-table time strong, .event-attendance-table time small { display: block; }
 .event-member-cell strong, .event-attendance-table time strong { color: var(--ink); font-size: .7rem; }
 .event-member-cell small, .event-attendance-table time small { margin-top: .15rem; color: #858b85; font-size: .58rem; }
-.event-muted { display: inline-flex; align-items: center; min-height: 1.45rem; padding: .18rem .5rem; color: #64706a; background: #edf0ec; border: 1px solid #dfe4dc; border-radius: .42rem; font-size: .56rem; font-weight: 700; letter-spacing: .02em; }
+.event-muted { color: #939891; }
 
 /* Small-group workspace — follows the events system */
 .group-mark { width: 2.7rem; height: 2.9rem; display: grid; flex: none; place-items: center; border-radius: .6rem; color: var(--accent-dark); background: var(--event-sage); font-size: .72rem; font-weight: 850; letter-spacing: -.03em; }
