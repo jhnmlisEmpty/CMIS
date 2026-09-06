@@ -4,7 +4,6 @@
     <x-page-header title="Members" subtitle="Manage member profiles, contact information, and account access.">
         <x-slot:actions>
             <a href="{{ route('users.export', ['search' => $search, 'roleFilter' => $roleFilter, 'statusFilter' => $statusFilter, 'smallGroupFilter' => $smallGroupFilter, 'locationFilter' => $locationFilter, 'birthdateFrom' => $birthdateFrom, 'birthdateTo' => $birthdateTo, 'minAge' => $minAge, 'maxAge' => $maxAge, 'sortBy' => $sortBy, 'sortDirection' => $sortDirection]) }}" class="event-button-secondary"><x-heroicon-o-arrow-down-tray aria-hidden="true" />Export list</a>
-            <a href="{{ route('users.map') }}" class="event-button-secondary" wire:navigate><x-heroicon-o-map-pin aria-hidden="true" />Member map</a>
             <a href="{{ route('users.create') }}" class="event-button-primary" wire:navigate><x-heroicon-o-plus aria-hidden="true" />New member</a>
         </x-slot:actions>
     </x-page-header>
@@ -54,7 +53,7 @@
                     </a>
                     <div class="member-contact-cell"><strong>{{ $user->phone ?: 'No phone' }}</strong><small>{{ $user->birthdate?->format('M j, Y') ?: 'No birthdate' }}</small></div>
                     <div class="event-location-cell"><x-heroicon-o-map-pin /><span title="{{ $user->address }}">{{ $user->address ?: 'No address' }}</span></div>
-                    <div class="member-small-group-cell">@if($user->smallGroups->count() > 0)<span class="event-type-badge">{{ $user->smallGroups->first()->name }}</span>@else<span class="event-muted">No group</span>@endif</div>
+                    <div class="member-small-group-cell">@if($user->smallGroups->count() > 0)<span class="member-role-badge">{{ $user->smallGroups->first()->name }}</span>@else<span class="member-role-badge">No group</span>@endif</div>
                     <div><span class="member-role-badge">{{ ucwords(str_replace('_', ' ', $user->role)) }}</span></div>
                     <div><span @class(['group-status', 'is-active' => $user->status === 'active'])><i></i>{{ ucfirst($user->status) }}</span></div>
                     <div class="event-row-actions">

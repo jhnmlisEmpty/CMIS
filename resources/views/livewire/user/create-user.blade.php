@@ -31,8 +31,7 @@
                         <label for="profilePhoto">Profile picture</label><p class="event-field-hint">Optional JPG, PNG, or WEBP image up to 5 MB.</p>
                         <input type="file" id="profilePhoto" wire:model="profilePhoto" accept="image/jpeg,image/png,image/webp" class="@error('profilePhoto') is-invalid @enderror">
                         @error('profilePhoto')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
-                        <div wire:loading wire:target="profilePhoto" class="event-field-hint">Uploading preview…</div>
-                        @if($profilePhoto)<img src="{{ $profilePhoto->temporaryUrl() }}" alt="Profile picture preview" class="member-photo-preview">@endif
+                        <div wire:loading wire:target="profilePhoto" class="event-field-hint">Uploading…</div>
                     </div>
                     <div class="event-field">
                         <label for="email">Email address <span aria-hidden="true">*</span></label><p class="event-field-hint">Used for contact and account identification.</p>

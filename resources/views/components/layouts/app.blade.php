@@ -37,9 +37,6 @@
                 <x-heroicon-o-user-group /><span>Members</span>
             </a>
             <p class="nav-section-label nav-section-label-secondary">Account</p>
-            <a href="{{ route('profile') }}" class="nav-item {{ request()->routeIs('profile') ? 'is-active' : '' }}" wire:navigate>
-                <x-heroicon-o-user /><span>Profile</span>
-            </a>
             <form method="POST" action="{{ route('logout') }}">@csrf
                 <button type="submit" class="nav-item logout-button">
                     <x-heroicon-o-arrow-left-start-on-rectangle /><span>Sign out</span>
@@ -52,7 +49,7 @@
         <div class="header-heading"><p>{{ $headerTitle ?? 'Overview' }}</p>@isset($headerSubtitle)<span>{{ $headerSubtitle }}</span>@endisset</div>
         <div class="header-actions">
             <a href="{{ route('users.create') }}" class="quick-add" wire:navigate><x-heroicon-o-plus /><span>Add member</span></a>
-            <a href="{{ route('profile') }}" class="profile-link" aria-label="Open profile" wire:navigate><span>{{ auth()->check() ? mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) : 'CM' }}</span></a>
+            <a href="{{ route('profile') }}" class="profile-link" aria-label="Open profile" wire:navigate>@if(auth()->user()?->profile_photo_path)<img src="{{ route('profile-photo', ['filename' => basename(auth()->user()->profile_photo_path)]) }}" alt="{{ auth()->user()->name }}" class="header-profile-photo">@else<span>{{ auth()->check() ? mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) : 'CM' }}</span>@endif</a>
         </div>
     </header>
     <main id="main-content" class="app-main" tabindex="-1"><div class="page-content">{{ $slot }}</div></main>

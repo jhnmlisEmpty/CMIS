@@ -52,7 +52,7 @@ Route::middleware('auth')->group(function () {
     })->name('home');
 
     Route::get('/profile', function () {
-        return view('profile');
+        return to_route('users.show', auth()->user());
     })->name('profile');
 
 // User/Member Management
