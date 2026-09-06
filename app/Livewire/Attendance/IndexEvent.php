@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Livewire\Attendance;
 
 use App\Models\Event;
