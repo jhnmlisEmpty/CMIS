@@ -1,68 +1,57 @@
 <div class="app-subview map-component member-map">
     @if($showFilters)
-        <section class="member-map-filters" aria-labelledby="map-filter-title">
+        <section class="member-map-filters event-directory-toolbar member-directory-toolbar" aria-labelledby="map-filter-title">
             <div class="member-map-heading"><div><span>01</span><div><h4 id="map-filter-title">Find members</h4><p>Search or narrow the pins shown on the map.</p></div></div></div>
-            <div class="member-map-filter-grid">
-                <!-- Search -->
-                <div class="event-field member-map-search">
-                    <label for="search">Search</label>
-                    <input type="text" 
-                           id="search" 
-                           wire:model.live.debounce.300ms="search"
-                           class="member-map-control"
-                           placeholder="Search by name, email, or address...">
+            @php $filterId = $this->getId(); @endphp
+            <div class="member-filter-group member-map-filter-group">
+                <div class="member-filter-row member-filter-row-primary">
+                    <label class="event-search" for="map-name-{{ $filterId }}"><span class="sr-only">Filter map by member name</span><input type="search" id="map-name-{{ $filterId }}" wire:model.live.debounce.300ms="search" placeholder="Search member name"></label>
+                    <label class="event-type-filter" for="map-role-{{ $filterId }}"><span class="sr-only">Filter map by role</span><select id="map-role-{{ $filterId }}" wire:model.live="roleFilter"><option value="">All roles</option>@foreach($roles as $role)<option value="{{ $role }}">{{ ucwords(str_replace('_', ' ', $role)) }}</option>@endforeach</select></label>
+                    <label class="event-type-filter" for="map-status-{{ $filterId }}"><span class="sr-only">Filter map by status</span><select id="map-status-{{ $filterId }}" wire:model.live="statusFilter"><option value="">All statuses</option>@foreach($statuses as $status)<option value="{{ $status }}">{{ ucfirst($status) }}</option>@endforeach</select></label>
+                    <label class="event-type-filter" for="map-small-group-{{ $filterId }}"><span class="sr-only">Filter map by small group</span><select id="map-small-group-{{ $filterId }}" wire:model.live="smallGroupFilter"><option value="">All small groups</option>@foreach($smallGroups as $smallGroup)<option value="{{ $smallGroup->id }}">{{ $smallGroup->name }}</option>@endforeach</select></label>
                 </div>
-
-                <!-- Role Filter -->
-                <div class="event-field">
-                    <label for="roleFilter">Role</label>
-                    <select id="roleFilter" 
-                            wire:model.live="roleFilter"
-                            class="member-map-control">
-                        <option value="">All Roles</option>
-                        @foreach($roles as $role)
-                            <option value="{{ $role }}">{{ ucwords(str_replace('_', ' ', $role)) }}</option>
-                        @endforeach
-                    </select>
+                <div class="member-filter-row member-filter-row-secondary">
+                    <label class="event-search" for="map-location-{{ $filterId }}"><span class="sr-only">Filter map by location</span><input type="search" id="map-location-{{ $filterId }}" wire:model.live.debounce.300ms="locationFilter" placeholder="Location"></label>
+                    <label class="event-type-filter" for="map-birthdate-from-{{ $filterId }}"><span class="sr-only">Birthdate from</span><input type="date" id="map-birthdate-from-{{ $filterId }}" wire:model.live="birthdateFrom"></label>
+                    <label class="event-type-filter" for="map-birthdate-to-{{ $filterId }}"><span class="sr-only">Birthdate to</span><input type="date" id="map-birthdate-to-{{ $filterId }}" wire:model.live="birthdateTo"></label>
                 </div>
-
-                <!-- Status Filter -->
-                <div class="event-field">
-                    <label for="statusFilter">Status</label>
-                    <select id="statusFilter" 
-                            wire:model.live="statusFilter"
-                            class="member-map-control">
-                        <option value="">All Statuses</option>
-                        @foreach($statuses as $status)
-                            <option value="{{ $status }}">{{ ucfirst($status) }}</option>
-                        @endforeach
-                    </select>
+                <div class="member-filter-row member-filter-row-age">
+                    <label class="event-type-filter" for="map-min-age-{{ $filterId }}"><span class="sr-only">Minimum age</span><input type="number" id="map-min-age-{{ $filterId }}" min="0" max="120" wire:model.live.debounce.300ms="minAge" placeholder="Min age"></label>
+                    <label class="event-type-filter" for="map-max-age-{{ $filterId }}"><span class="sr-only">Maximum age</span><input type="number" id="map-max-age-{{ $filterId }}" min="0" max="120" wire:model.live.debounce.300ms="maxAge" placeholder="Max age"></label>
                 </div>
             </div>
 
-            @if($search || $roleFilter || $statusFilter)
+            @if($this->hasActiveFilters())
                 <div class="member-map-active-filters">
                     <span>Active filters</span>
                     @if($search)
-                        <span class="member-map-filter-chip">
-                            Search: {{ $search }}
-                        </span>
+                        <span class="member-map-filter-chip">Name: {{ $search }}</span>
+                    @endif
+                    @if($locationFilter)
+                        <span class="member-map-filter-chip">Location: {{ $locationFilter }}</span>
                     @endif
                     @if($roleFilter)
-                        <span class="member-map-filter-chip">
-                            {{ ucwords(str_replace('_', ' ', $roleFilter)) }}
-                        </span>
+                        <span class="member-map-filter-chip">Role: {{ ucwords(str_replace('_', ' ', $roleFilter)) }}</span>
                     @endif
                     @if($statusFilter)
-                        <span class="member-map-filter-chip">
-                            {{ ucfirst($statusFilter) }}
-                        </span>
+                        <span class="member-map-filter-chip">Status: {{ ucfirst($statusFilter) }}</span>
                     @endif
-                    <button type="button" 
-                            wire:click="clearFilters"
-                            class="member-map-clear">
-                        Clear all
-                    </button>
+                    @if($smallGroupFilter)
+                        <span class="member-map-filter-chip">Group: {{ $smallGroups->firstWhere('id', (int) $smallGroupFilter)?->name }}</span>
+                    @endif
+                    @if($birthdateFrom)
+                        <span class="member-map-filter-chip">Born from: {{ $birthdateFrom }}</span>
+                    @endif
+                    @if($birthdateTo)
+                        <span class="member-map-filter-chip">Born to: {{ $birthdateTo }}</span>
+                    @endif
+                    @if($minAge !== '')
+                        <span class="member-map-filter-chip">Min age: {{ $minAge }}</span>
+                    @endif
+                    @if($maxAge !== '')
+                        <span class="member-map-filter-chip">Max age: {{ $maxAge }}</span>
+                    @endif
+                    <button type="button" wire:click="clearFilters" class="member-map-clear">Clear all</button>
                 </div>
             @endif
         </section>
@@ -80,6 +69,7 @@
             <div 
                 x-data="usersMapComponent(@js($usersForMap), @js($mapId))"
                 x-init="initMap()"
+                x-on:users-map-updated.window="handleMapUpdate($event.detail)"
                 wire:ignore
                 class="member-map-frame"
             >
@@ -104,7 +94,7 @@
                 <x-heroicon-o-map-pin />
                 <strong>No locations found</strong>
                 <p>
-                    @if($search || $roleFilter || $statusFilter !== 'active')
+                    @if($this->hasActiveFilters())
                         No members match your current filters. Try adjusting your search criteria.
                     @else
                         No members have location data yet. Add locations to members to see them on the map.
@@ -161,17 +151,8 @@
                     maxZoom: 19
                 }).addTo(this.map);
 
-                // Add markers for all users
                 this.addMarkers();
-
-                // Fit map to show all markers
-                if (this.markers.length > 0) {
-                    const group = new L.featureGroup(this.markers);
-                    this.map.fitBounds(group.getBounds().pad(0.1));
-                } else {
-                    // Default to Philippines center if no markers
-                    this.map.setView([12.8797, 121.7740], 6);
-                }
+                this.fitMarkers();
 
                 // Fix map rendering
                 setTimeout(() => {
@@ -189,6 +170,28 @@
                 'member': '#6b7280'      // gray-500
             };
             return colors[role] || colors['member'];
+        },
+
+        handleMapUpdate(detail) {
+            if (`users-map-${detail.componentId}` !== this.mapId || !this.map) {
+                return;
+            }
+
+            this.markers.forEach(marker => this.map.removeLayer(marker));
+            this.markers = [];
+            this.users = detail.users;
+            this.addMarkers();
+            this.fitMarkers();
+        },
+
+        fitMarkers() {
+            if (this.markers.length > 0) {
+                const group = new L.featureGroup(this.markers);
+                this.map.fitBounds(group.getBounds().pad(0.1));
+                return;
+            }
+
+            this.map.setView([12.8797, 121.7740], 6);
         },
 
         addMarkers() {
@@ -221,6 +224,8 @@
                         <div class="font-semibold text-gray-900 mb-1">${user.name}</div>
                         <div class="text-xs text-gray-500 mb-2">${user.role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
                         ${user.address ? `<div class="text-xs text-gray-600 mb-2">${user.address}</div>` : ''}
+                        ${user.smallGroup ? `<div class="text-xs text-gray-600 mb-1">Small group: ${user.smallGroup}</div>` : ''}
+                        ${user.birthdate ? `<div class="text-xs text-gray-600 mb-2">Born ${user.birthdate}${user.age !== null ? ` (${user.age} years old)` : ''}</div>` : ''}
                         <div class="flex gap-2 mt-2">
                             <a href="${user.viewUrl}" class="text-xs text-blue-600 hover:underline">View Profile</a>
                             <a href="https://www.google.com/maps?q=${user.latitude},${user.longitude}" target="_blank" class="text-xs text-green-600 hover:underline">Directions</a>

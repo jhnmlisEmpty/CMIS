@@ -3,7 +3,7 @@
 
     <x-page-header
         title="Member locations"
-        subtitle="See where members are located and narrow the map by name, role, or status."
+        subtitle="Filter mapped members by name, location, birthday, age, role, status, or small group."
         :backRoute="route('users.index')"
         backLabel="Members">
         <x-slot:actions>
