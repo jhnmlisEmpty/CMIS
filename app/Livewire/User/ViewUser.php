@@ -13,8 +13,12 @@ class ViewUser extends Component
 {
     public User $user;
 
-    public function mount(User $user): void
+    public function mount(?User $user = null): void
     {
+        $user ??= auth()->user();
+
+        abort_if(auth()->user()?->hasRole(User::ROLE_MEMBER) && auth()->id() !== $user->id, 403);
+
         $this->user = $user;
     }
 

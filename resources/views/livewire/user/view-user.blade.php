@@ -1,13 +1,16 @@
-<div class="event-page member-page member-detail-page">
-    <x-slot:headerTitle>Member Details</x-slot:headerTitle>
+<div class="event-page member-page member-detail-page" x-data="{ qrOpen: false }" @keydown.escape.window="qrOpen = false">
+    <x-slot:headerTitle>{{ auth()->id() === $user->id ? 'My Profile' : 'Member Details' }}</x-slot:headerTitle>
 
     <x-page-header
         :title="$user->name"
         subtitle="View the member profile, account details, and recorded location."
-        :backRoute="route('users.index')"
-        backLabel="Members">
+        :backRoute="auth()->id() === $user->id ? route('profile') : route('users.index')"
+        :backLabel="auth()->id() === $user->id ? 'My profile' : 'Members'">
         <x-slot:actions>
-            <a href="{{ route('users.edit', $user) }}" class="event-button-secondary" wire:navigate><x-heroicon-o-pencil-square />Edit member</a>
+            <a href="{{ auth()->id() === $user->id ? route('profile.edit') : route('users.edit', $user) }}" class="event-button-secondary" wire:navigate><x-heroicon-o-pencil-square />{{ auth()->id() === $user->id ? 'Edit my profile' : 'Edit member' }}</a>
+            @if(auth()->id() === $user->id)
+                <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="event-button-secondary profile-logout-button"><x-heroicon-o-arrow-left-start-on-rectangle />Log out</button></form>
+            @endif
         </x-slot:actions>
     </x-page-header>
 
@@ -19,10 +22,21 @@
             <div><x-heroicon-o-phone /><span>{{ $user->phone ?: 'No phone number provided' }}</span></div>
         </div>
         <div class="member-qr-card">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ urlencode($user->uuid) }}" alt="QR code for {{ $user->name }}">
+            <button type="button" class="member-qr-trigger" @click="qrOpen = true" aria-label="Enlarge QR code for {{ $user->name }}">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ urlencode($user->uuid) }}" alt="QR code for {{ $user->name }}">
+            </button>
             <div><span>Member QR</span><code>{{ Str::limit($user->uuid, 13) }}</code></div>
         </div>
     </section>
+
+    <div x-cloak x-show="qrOpen" class="member-qr-modal" role="dialog" aria-modal="true" aria-labelledby="member-qr-modal-title">
+        <button type="button" class="member-qr-modal-backdrop" @click="qrOpen = false" aria-label="Close QR code"></button>
+        <section class="member-qr-modal-panel" @click.outside="qrOpen = false">
+            <div class="member-qr-modal-heading"><div><span>Member QR</span><h2 id="member-qr-modal-title">{{ $user->name }}</h2></div><button type="button" class="member-qr-modal-close" @click="qrOpen = false" aria-label="Close QR code"><x-heroicon-o-x-mark /></button></div>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={{ urlencode($user->uuid) }}" alt="Enlarged QR code for {{ $user->name }}" class="member-qr-modal-image">
+            <p>Scan this code to identify this church member.</p>
+        </section>
+    </div>
 
     <div class="member-detail-grid">
         <section class="event-checkin-panel" aria-labelledby="personal-info-title">
@@ -60,7 +74,7 @@
                 </div>
             </div>
         @else
-            <div class="event-empty-state event-empty-compact"><span class="event-empty-icon"><x-heroicon-o-map-pin /></span><h3>No location recorded</h3><p>Edit this member to add an address and map position.</p><a href="{{ route('users.edit', $user) }}" class="event-button-secondary" wire:navigate>Add location</a></div>
+            <div class="event-empty-state event-empty-compact"><span class="event-empty-icon"><x-heroicon-o-map-pin /></span><h3>No location recorded</h3><p>Edit this member to add an address and map position.</p><a href="{{ auth()->id() === $user->id ? route('profile.edit') : route('users.edit', $user) }}" class="event-button-secondary" wire:navigate>Add location</a></div>
         @endif
     </section>
 </div>

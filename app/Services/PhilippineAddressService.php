@@ -5,18 +5,48 @@ namespace App\Services;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Client\Response;
 
 class PhilippineAddressService
 {
     protected string $baseUrl = 'https://psgc.cloud/api';
     protected int $cacheDuration = 86400; // 24 hours in seconds
 
+    /**
+     * Perform a PSGC request without allowing a temporary upstream/network
+     * failure to take down the address form.
+     */
+    protected function psgcGet(string $path): ?Response
+    {
+        try {
+            $response = Http::connectTimeout(3)
+                ->timeout(10)
+                ->get("{$this->baseUrl}/{$path}");
+
+            if ($response->successful()) {
+                return $response;
+            }
+
+            Log::warning('PSGC request returned an unsuccessful response.', [
+                'path' => $path,
+                'status' => $response->status(),
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('PSGC request failed.', [
+                'path' => $path,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+
+        return null;
+    }
+
     public function getRegions(): array
     {
         return Cache::remember('psgc_regions', $this->cacheDuration, function () {
-            $response = Http::get("{$this->baseUrl}/regions");
+            $response = $this->psgcGet('regions');
             
-            if ($response->successful()) {
+            if ($response) {
                 return collect($response->json())
                     ->map(fn($item) => [
                         'code' => $item['code'],
@@ -38,9 +68,9 @@ class PhilippineAddressService
         }
 
         return Cache::remember("psgc_provinces_{$regionCode}", $this->cacheDuration, function () use ($regionCode) {
-            $response = Http::get("{$this->baseUrl}/regions/{$regionCode}/provinces");
+            $response = $this->psgcGet("regions/{$regionCode}/provinces");
             
-            if ($response->successful()) {
+            if ($response) {
                 return collect($response->json())
                     ->map(fn($item) => [
                         'code' => $item['code'],
@@ -62,9 +92,9 @@ class PhilippineAddressService
         }
 
         return Cache::remember("psgc_cities_{$provinceCode}", $this->cacheDuration, function () use ($provinceCode) {
-            $response = Http::get("{$this->baseUrl}/provinces/{$provinceCode}/cities-municipalities");
+            $response = $this->psgcGet("provinces/{$provinceCode}/cities-municipalities");
             
-            if ($response->successful()) {
+            if ($response) {
                 return collect($response->json())
                     ->map(fn($item) => [
                         'code' => $item['code'],
@@ -86,9 +116,9 @@ class PhilippineAddressService
         }
 
         return Cache::remember("psgc_barangays_{$cityCode}", $this->cacheDuration, function () use ($cityCode) {
-            $response = Http::get("{$this->baseUrl}/cities-municipalities/{$cityCode}/barangays");
+            $response = $this->psgcGet("cities-municipalities/{$cityCode}/barangays");
             
-            if ($response->successful()) {
+            if ($response) {
                 return collect($response->json())
                     ->map(fn($item) => [
                         'code' => $item['code'],
@@ -106,9 +136,9 @@ class PhilippineAddressService
     public function getRegionByCode(string $code): ?array
     {
         return Cache::remember("psgc_region_{$code}", $this->cacheDuration, function () use ($code) {
-            $response = Http::get("{$this->baseUrl}/regions/{$code}");
+            $response = $this->psgcGet("regions/{$code}");
             
-            if ($response->successful()) {
+            if ($response) {
                 $data = $response->json();
                 return [
                     'code' => $data['code'],
@@ -123,9 +153,9 @@ class PhilippineAddressService
     public function getProvinceByCode(string $code): ?array
     {
         return Cache::remember("psgc_province_{$code}", $this->cacheDuration, function () use ($code) {
-            $response = Http::get("{$this->baseUrl}/provinces/{$code}");
+            $response = $this->psgcGet("provinces/{$code}");
             
-            if ($response->successful()) {
+            if ($response) {
                 $data = $response->json();
                 return [
                     'code' => $data['code'],
@@ -140,9 +170,9 @@ class PhilippineAddressService
     public function getCityByCode(string $code): ?array
     {
         return Cache::remember("psgc_city_{$code}", $this->cacheDuration, function () use ($code) {
-            $response = Http::get("{$this->baseUrl}/cities-municipalities/{$code}");
+            $response = $this->psgcGet("cities-municipalities/{$code}");
             
-            if ($response->successful()) {
+            if ($response) {
                 $data = $response->json();
                 return [
                     'code' => $data['code'],
@@ -157,9 +187,9 @@ class PhilippineAddressService
     public function getBarangayByCode(string $code): ?array
     {
         return Cache::remember("psgc_barangay_{$code}", $this->cacheDuration, function () use ($code) {
-            $response = Http::get("{$this->baseUrl}/barangays/{$code}");
+            $response = $this->psgcGet("barangays/{$code}");
             
-            if ($response->successful()) {
+            if ($response) {
                 $data = $response->json();
                 return [
                     'code' => $data['code'],
