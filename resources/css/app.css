@@ -860,9 +860,12 @@ main .font-mono, main [class*='text-2xl'], main [class*='text-3xl'] { font-varia
 .home-calendar-controls button:hover { color: white; background: var(--accent); border-color: var(--accent); }
 .home-calendar-controls button:nth-child(2) { width: auto; padding-right: .5rem; padding-left: .5rem; }
 .home-calendar-weekdays, .home-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.home-calendar-grid, .home-calendar-weekdays { position: relative; }
+.home-calendar-grid::before, .home-calendar-weekdays::before { position: absolute; top: 0; bottom: 0; left: 85.7142857%; z-index: 1; width: 1px; background: #eaebe5; content: ''; pointer-events: none; }
 .home-calendar-weekdays { padding: .8rem 1rem .45rem; color: var(--muted); font-size: .56rem; font-weight: 800; letter-spacing: .06em; text-align: center; text-transform: uppercase; }
 .home-calendar-day { position: relative; min-height: 5.3rem; display: flex; flex-direction: column; align-items: center; gap: .3rem; padding: .55rem .25rem; color: var(--ink); border-top: 1px solid #eaebe5; border-right: 1px solid #eaebe5; font-size: .68rem; }
-.home-calendar-day:nth-child(7n) { border-right: 0; }
+.home-calendar-day:nth-child(7n - 1) { border-right: 0; }
+.home-calendar-day:nth-child(7n) { border-right: 0; border-left: 1px solid #eaebe5; }
 .home-calendar-day.is-muted { color: #b4b9b3; background: #fafaf7; }
 .home-calendar-day.is-today > span { width: 1.5rem; height: 1.5rem; display: grid; place-items: center; color: white; background: var(--accent); border-radius: .45rem; font-weight: 800; }
 .home-calendar-events { width: 100%; display: grid; gap: .2rem; }
