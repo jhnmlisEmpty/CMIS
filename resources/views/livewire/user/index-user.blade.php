@@ -1,5 +1,6 @@
 <div class="event-page member-page">
     <x-slot:headerTitle>Members</x-slot:headerTitle>
+    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
 
     <x-page-header title="Members" subtitle="Manage member profiles, contact information, and account access.">
         <x-slot:actions>

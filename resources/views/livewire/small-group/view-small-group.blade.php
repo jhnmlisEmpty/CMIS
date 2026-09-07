@@ -1,5 +1,6 @@
 <div class="event-page group-page group-detail-page">
     <x-slot:headerTitle>Small Group Details</x-slot:headerTitle>
+    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
 
     <x-page-header
         :title="$smallGroup->name"

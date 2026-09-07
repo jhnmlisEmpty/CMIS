@@ -1,6 +1,7 @@
 <div class="event-page member-page member-map-page">
     <x-slot:headerTitle>Member Locations</x-slot:headerTitle>
-
+    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    
     <x-page-header
         title="Member locations"
         subtitle="Filter mapped members by name, location, birthday, age, role, status, or small group."

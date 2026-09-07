@@ -1,5 +1,6 @@
 <div class="event-page member-page">
     <x-slot:headerTitle>My Profile</x-slot:headerTitle>
+    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
 
     <x-page-header title="Edit my profile" subtitle="Keep your personal information and contact details up to date." :backRoute="route('profile')" backLabel="My profile" />
 

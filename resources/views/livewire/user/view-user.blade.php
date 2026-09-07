@@ -1,6 +1,7 @@
 <div class="event-page member-page member-detail-page" x-data="{ qrOpen: false }" @keydown.escape.window="qrOpen = false">
     <x-slot:headerTitle>{{ auth()->id() === $user->id ? 'My Profile' : 'Member Details' }}</x-slot:headerTitle>
-
+    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    
     <x-page-header
         :title="$user->name"
         subtitle="View the member profile, account details, and recorded location."
