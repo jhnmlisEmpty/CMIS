@@ -15,8 +15,9 @@
     @livewireStyles
     @stack('styles')
 </head>
-<body class="app-body min-h-screen font-sans antialiased">
+<body class="app-body min-h-screen font-sans antialiased {{ auth()->user()?->hasRole(\App\Models\User::ROLE_MEMBER) ? 'member-profile-shell' : '' }}">
     <a href="#main-content" class="skip-link">Skip to content</a>
+    @unless(auth()->user()?->hasRole(\App\Models\User::ROLE_MEMBER))
     <aside class="app-sidebar" aria-label="Primary navigation">
         <a href="{{ route('home') }}" class="brand-lockup" wire:navigate>
             <img src="{{ asset('images/true-vine-logo.png') }}" class="brand-logo" alt="True Vine World Harvest Church logo">
@@ -44,15 +45,19 @@
             </form>
         </nav>
     </aside>
+    @endunless
     <header class="app-header">
         <div class="mobile-brand"><img src="{{ asset('images/true-vine-logo.png') }}" class="mobile-brand-logo" alt="True Vine World Harvest Church logo"><strong>True Vine World Harvest Church</strong></div>
         <div class="header-heading"><p>{{ $headerTitle ?? 'Overview' }}</p>@isset($headerSubtitle)<span>{{ $headerSubtitle }}</span>@endisset</div>
         <div class="header-actions">
-            <a href="{{ route('users.create') }}" class="quick-add" wire:navigate><x-heroicon-o-plus /><span>Add member</span></a>
+            @unless(auth()->user()?->hasRole(\App\Models\User::ROLE_MEMBER))
+                <a href="{{ route('users.create') }}" class="quick-add" wire:navigate><x-heroicon-o-plus /><span>Add member</span></a>
+            @endunless
             <a href="{{ route('profile') }}" class="profile-link" aria-label="Open profile" wire:navigate>@if(auth()->user()?->profile_photo_path)<img src="{{ route('profile-photo', ['filename' => basename(auth()->user()->profile_photo_path)]) }}" alt="{{ auth()->user()->name }}" class="header-profile-photo">@else<span>{{ auth()->check() ? mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) : 'CM' }}</span>@endif</a>
         </div>
     </header>
     <main id="main-content" class="app-main" tabindex="-1"><div class="page-content">{{ $slot }}</div></main>
+    @unless(auth()->user()?->hasRole(\App\Models\User::ROLE_MEMBER))
     <nav class="mobile-nav" aria-label="Mobile navigation">
         <a href="{{ route('home') }}" class="{{ request()->routeIs('home') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-squares-2x2 /><span>Overview</span></a>
         <a href="{{ route('events.index') }}" class="{{ request()->routeIs('events.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-calendar-days /><span>Events</span></a>
@@ -60,6 +65,7 @@
         <a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-user-group /><span>Members</span></a>
         <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit"><x-heroicon-o-arrow-left-start-on-rectangle /><span>Sign out</span></button></form>
     </nav>
+    @endunless
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     @livewireScripts
     @stack('scripts')

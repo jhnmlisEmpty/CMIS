@@ -2,7 +2,6 @@
 
 namespace App\Livewire\User;
 
-use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -14,13 +13,12 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 
 #[Layout('components.layouts.app')]
-#[Title('Edit Member')]
-class UpdateUser extends Component
+#[Title('My Profile')]
+class EditProfile extends Component
 {
     use WithFileUploads;
 
-    public User $user;
-    
+    public $user;
     public string $name = '';
     public string $email = '';
     public string $password = '';
@@ -31,42 +29,32 @@ class UpdateUser extends Component
     public string $address = '';
     public ?float $latitude = null;
     public ?float $longitude = null;
-    public string $role = 'member';
-    public string $status = 'active';
     public $profilePhoto;
 
-    // PSGC Address Fields
     public string $regionCode = '';
     public string $provinceCode = '';
     public string $cityCode = '';
     public string $barangayCode = '';
     public string $streetAddress = '';
 
-    public function mount(User $user): void
+    public function mount(): void
     {
-        abort_if(auth()->user()?->hasRole(User::ROLE_MEMBER) && auth()->id() !== $user->id, 403);
-
-        $this->user = $user;
-        $this->name = $user->name;
-        $this->email = $user->email;
-        $this->gender = $user->gender ?? '';
-        $this->birthdate = $user->birthdate?->format('Y-m-d');
-        $this->phone = $user->phone ?? '';
-        $this->address = $user->address ?? '';
-        $this->regionCode = $user->region_code ?? '';
-        $this->provinceCode = $user->province_code ?? '';
-        $this->cityCode = $user->city_code ?? '';
-        $this->barangayCode = $user->barangay_code ?? '';
-        $this->streetAddress = $user->street_address ?? '';
-        $this->latitude = $user->latitude;
-        $this->longitude = $user->longitude;
-        $this->role = $user->role;
-        $this->status = $user->status;
+        $this->user = auth()->user();
+        $this->name = $this->user->name;
+        $this->email = $this->user->email;
+        $this->gender = $this->user->gender ?? '';
+        $this->birthdate = $this->user->birthdate?->format('Y-m-d');
+        $this->phone = $this->user->phone ?? '';
+        $this->address = $this->user->address ?? '';
+        $this->regionCode = $this->user->region_code ?? '';
+        $this->provinceCode = $this->user->province_code ?? '';
+        $this->cityCode = $this->user->city_code ?? '';
+        $this->barangayCode = $this->user->barangay_code ?? '';
+        $this->streetAddress = $this->user->street_address ?? '';
+        $this->latitude = $this->user->latitude;
+        $this->longitude = $this->user->longitude;
     }
 
-    /**
-     * Handle location selection from AddressMapPicker component
-     */
     #[On('location-selected')]
     public function handleLocationSelected(
         ?float $latitude,
@@ -88,7 +76,7 @@ class UpdateUser extends Component
         $this->streetAddress = $streetAddress;
     }
 
-    public function rules(): array
+    protected function rules(): array
     {
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -101,8 +89,6 @@ class UpdateUser extends Component
             'address' => ['nullable', 'string', 'max:500'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'role' => ['required', 'in:' . implode(',', User::ROLES)],
-            'status' => ['required', 'in:' . implode(',', User::STATUSES)],
             'regionCode' => ['nullable', 'string'],
             'provinceCode' => ['nullable', 'string'],
             'cityCode' => ['nullable', 'string'],
@@ -129,11 +115,9 @@ class UpdateUser extends Component
             'street_address' => $validated['streetAddress'] ?: null,
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
-            'role' => $validated['role'],
-            'status' => $validated['status'],
         ];
 
-        if (!empty($validated['password'])) {
+        if ($validated['password'] ?? null) {
             $data['password'] = Hash::make($validated['password']);
         }
 
@@ -145,18 +129,14 @@ class UpdateUser extends Component
         }
 
         $this->user->update($data);
-
-        session()->flash('success', 'Member updated successfully.');
-
-        $this->redirect(route('users.index'), navigate: true);
+        session()->flash('success', 'Your profile was updated successfully.');
+        $this->redirect(route('profile'), navigate: true);
     }
 
     public function render()
     {
-        return view('livewire.user.update-user', [
-            'roles' => User::ROLES,
-            'statuses' => User::STATUSES,
-            'genders' => [User::GENDER_MALE, User::GENDER_FEMALE],
+        return view('livewire.user.edit-profile', [
+            'genders' => ['male', 'female'],
         ]);
     }
 }
