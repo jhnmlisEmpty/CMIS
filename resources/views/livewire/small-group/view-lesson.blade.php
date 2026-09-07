@@ -1,5 +1,6 @@
 <div class="event-page group-page lesson-detail-page">
     <x-slot:headerTitle>Lesson Details</x-slot:headerTitle>
+    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
 
     <x-page-header
         :title="$lesson->title"

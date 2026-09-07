@@ -1,5 +1,6 @@
 <div class="event-page group-page">
     <x-slot:headerTitle>Edit Small Group</x-slot:headerTitle>
+    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
 
     <x-page-header
         title="Edit small group"

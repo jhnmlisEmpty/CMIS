@@ -1,6 +1,7 @@
 <div class="event-page member-page">
     <x-slot:headerTitle>Edit Member</x-slot:headerTitle>
-
+    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    
     <x-page-header title="Edit member" :subtitle="'Keep ' . $user->name . '’s profile and account access accurate.'" :backRoute="route('users.show', $user)" backLabel="Member details" />
 
     <form wire:submit="save" class="member-editor-layout">
