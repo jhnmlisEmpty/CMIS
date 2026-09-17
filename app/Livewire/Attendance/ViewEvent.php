@@ -1,37 +1,50 @@
 <?php
+
 namespace App\Livewire\Attendance;
 
-use Livewire\Component;
-use App\Models\Event;
 use App\Models\Attendance;
+use App\Models\Event;
 use App\Models\SmallGroup;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
-
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
+use Livewire\Component;
 
 #[Layout('components.layouts.app')]
 #[Title('Event Details')]
 class ViewEvent extends Component
 {
     public Event $event;
+
     public string $scannedUuid = '';
+
     public string $searchName = '';
+
     public string $attendanceSearch = '';
+
     public string $attendanceRoleFilter = '';
+
     public string $attendanceSmallGroupFilter = '';
+
     public string $attendanceLocationFilter = '';
+
     public string $attendanceBirthdateFrom = '';
+
     public string $attendanceBirthdateTo = '';
+
     public string $attendanceMinAge = '';
+
     public string $attendanceMaxAge = '';
+
     public string $message = '';
+
     public string $messageType = ''; // 'success' or 'error'
 
     public function mount(Event $event): void
     {
+        Gate::authorize('attendance.view');
         $this->event = $event;
     }
 
@@ -46,7 +59,7 @@ class ViewEvent extends Component
         $minuteData = [];
         foreach ($attendances as $attendance) {
             $minute = $attendance->check_in_time->format('H:i');
-            if (!isset($minuteData[$minute])) {
+            if (! isset($minuteData[$minute])) {
                 $minuteData[$minute] = 0;
             }
             $minuteData[$minute]++;
@@ -102,14 +115,15 @@ class ViewEvent extends Component
         }
 
         if ($driver === 'pgsql') {
-            return "(EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)))";
+            return '(EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)))';
         }
 
-        return "(TIMESTAMPDIFF(YEAR, birthdate, CURDATE()))";
+        return '(TIMESTAMPDIFF(YEAR, birthdate, CURDATE()))';
     }
 
     public function clearAttendanceFilters(): void
     {
+        Gate::authorize('attendance.view');
         $this->reset([
             'attendanceSearch',
             'attendanceRoleFilter',
@@ -124,21 +138,23 @@ class ViewEvent extends Component
 
     public function getAttendances()
     {
+        Gate::authorize('attendance.view');
         $query = $this->event->attendances()
             ->with([
                 'user',
                 'user.smallGroups' => function ($query) {
                     $query->where('small_group_members.status', 'active')
                         ->where('small_groups.status', 'active');
-                }
+                },
             ])
             ->whereHas('user', function ($userQuery) {
-                $userQuery->when($this->attendanceSearch !== '', function ($q) {
+                $userQuery->visibleTo(auth()->user())
+                    ->when($this->attendanceSearch !== '', function ($q) {
                     $q->where(function ($inner) {
-                        $inner->where('name', 'like', '%' . $this->attendanceSearch . '%')
-                            ->orWhere('email', 'like', '%' . $this->attendanceSearch . '%')
-                            ->orWhere('phone', 'like', '%' . $this->attendanceSearch . '%')
-                            ->orWhere('address', 'like', '%' . $this->attendanceSearch . '%');
+                        $inner->where('name', 'like', '%'.$this->attendanceSearch.'%')
+                            ->orWhere('email', 'like', '%'.$this->attendanceSearch.'%')
+                            ->orWhere('phone', 'like', '%'.$this->attendanceSearch.'%')
+                            ->orWhere('address', 'like', '%'.$this->attendanceSearch.'%');
                     });
                 })
                     ->when($this->attendanceRoleFilter !== '', fn ($q) => $q->where('role', $this->attendanceRoleFilter))
@@ -150,11 +166,11 @@ class ViewEvent extends Component
                     })
                     ->when($this->attendanceLocationFilter !== '', function ($q) {
                         $q->where(function ($inner) {
-                            $inner->where('address', 'like', '%' . $this->attendanceLocationFilter . '%')
-                                ->orWhere('street_address', 'like', '%' . $this->attendanceLocationFilter . '%')
-                                ->orWhere('city_code', 'like', '%' . $this->attendanceLocationFilter . '%')
-                                ->orWhere('province_code', 'like', '%' . $this->attendanceLocationFilter . '%')
-                                ->orWhere('barangay_code', 'like', '%' . $this->attendanceLocationFilter . '%');
+                            $inner->where('address', 'like', '%'.$this->attendanceLocationFilter.'%')
+                                ->orWhere('street_address', 'like', '%'.$this->attendanceLocationFilter.'%')
+                                ->orWhere('city_code', 'like', '%'.$this->attendanceLocationFilter.'%')
+                                ->orWhere('province_code', 'like', '%'.$this->attendanceLocationFilter.'%')
+                                ->orWhere('barangay_code', 'like', '%'.$this->attendanceLocationFilter.'%');
                         });
                     })
                     ->when($this->attendanceBirthdateFrom !== '', fn ($q) => $q->whereDate('birthdate', '>=', $this->attendanceBirthdateFrom))
@@ -163,11 +179,11 @@ class ViewEvent extends Component
                         $q->whereNotNull('birthdate');
 
                         if ($this->attendanceMinAge !== '') {
-                            $q->whereRaw($this->attendanceAgeSqlExpression() . ' >= ?', [(int) $this->attendanceMinAge]);
+                            $q->whereRaw($this->attendanceAgeSqlExpression().' >= ?', [(int) $this->attendanceMinAge]);
                         }
 
                         if ($this->attendanceMaxAge !== '') {
-                            $q->whereRaw($this->attendanceAgeSqlExpression() . ' <= ?', [(int) $this->attendanceMaxAge]);
+                            $q->whereRaw($this->attendanceAgeSqlExpression().' <= ?', [(int) $this->attendanceMaxAge]);
                         }
                     });
             })
@@ -181,11 +197,14 @@ class ViewEvent extends Component
      */
     public function getSearchResults()
     {
+        Gate::authorize('attendance.record');
         if (strlen(trim($this->searchName)) < 2) {
             return collect();
         }
 
-        return User::where('name', 'like', '%' . $this->searchName . '%')
+        return User::query()
+            ->visibleTo(auth()->user())
+            ->where('name', 'like', '%'.$this->searchName.'%')
             ->where('status', 'active')
             ->limit(10)
             ->get();
@@ -196,15 +215,17 @@ class ViewEvent extends Component
      */
     public function checkInByUserId($userId): void
     {
+        Gate::authorize('attendance.record');
         $this->message = '';
         $this->messageType = '';
 
         try {
-            $user = User::find($userId);
+            $user = User::query()->visibleTo(auth()->user())->find($userId);
 
-            if (!$user) {
+            if (! $user) {
                 $this->messageType = 'error';
                 $this->message = 'User not found.';
+
                 return;
             }
 
@@ -215,8 +236,9 @@ class ViewEvent extends Component
 
             if ($existingAttendance) {
                 $this->messageType = 'error';
-                $this->message = $user->name . ' is already checked in for this event.';
+                $this->message = $user->name.' is already checked in for this event.';
                 $this->searchName = '';
+
                 return;
             }
 
@@ -229,12 +251,12 @@ class ViewEvent extends Component
             ]);
 
             $this->messageType = 'success';
-            $this->message = $user->name . ' has been checked in successfully.';
+            $this->message = $user->name.' has been checked in successfully.';
             $this->searchName = '';
 
         } catch (\Exception $e) {
             $this->messageType = 'error';
-            $this->message = 'An error occurred while recording attendance: ' . $e->getMessage();
+            $this->message = 'An error occurred while recording attendance: '.$e->getMessage();
             $this->searchName = '';
         }
     }
@@ -245,6 +267,7 @@ class ViewEvent extends Component
      */
     public function handleQrScan(): void
     {
+        Gate::authorize('attendance.record');
         // Reset message
         $this->message = '';
         $this->messageType = '';
@@ -253,17 +276,19 @@ class ViewEvent extends Component
         if (empty($this->scannedUuid)) {
             $this->messageType = 'error';
             $this->message = 'No UUID scanned. Please scan a valid QR code.';
+
             return;
         }
 
         try {
             // Find user by UUID
-            $user = User::where('uuid', trim($this->scannedUuid))->first();
-            
-            if (!$user) {
+            $user = User::query()->visibleTo(auth()->user())->where('uuid', trim($this->scannedUuid))->first();
+
+            if (! $user) {
                 $this->messageType = 'error';
                 $this->message = 'User not found. Invalid QR code.';
                 $this->scannedUuid = '';
+
                 return;
             }
 
@@ -274,8 +299,9 @@ class ViewEvent extends Component
 
             if ($existingAttendance) {
                 $this->messageType = 'error';
-                $this->message = $user->name . ' is already checked in for this event.';
+                $this->message = $user->name.' is already checked in for this event.';
                 $this->scannedUuid = '';
+
                 return;
             }
 
@@ -288,12 +314,12 @@ class ViewEvent extends Component
             ]);
 
             $this->messageType = 'success';
-            $this->message = $user->name . ' has been checked in successfully.';
+            $this->message = $user->name.' has been checked in successfully.';
             $this->scannedUuid = '';
 
         } catch (\Exception $e) {
             $this->messageType = 'error';
-            $this->message = 'An error occurred while recording attendance: ' . $e->getMessage();
+            $this->message = 'An error occurred while recording attendance: '.$e->getMessage();
             $this->scannedUuid = '';
         }
     }
@@ -304,7 +330,7 @@ class ViewEvent extends Component
             'event' => $this->event,
             'attendanceRoles' => User::ROLES,
             'attendanceStatuses' => User::STATUSES,
-            'smallGroups' => SmallGroup::query()->active()->orderBy('name')->get(),
+            'smallGroups' => SmallGroup::query()->visibleTo(auth()->user())->active()->orderBy('name')->get(),
         ]);
     }
 }

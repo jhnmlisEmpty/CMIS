@@ -3,6 +3,7 @@
 namespace App\Livewire\User;
 
 use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -20,31 +21,53 @@ class UpdateUser extends Component
     use WithFileUploads;
 
     public User $user;
-    
+
     public string $name = '';
+
     public string $email = '';
+
     public string $password = '';
+
     public string $password_confirmation = '';
+
     public string $gender = '';
+
     public ?string $birthdate = null;
+
     public string $phone = '';
+
     public string $address = '';
+
     public ?float $latitude = null;
+
     public ?float $longitude = null;
+
     public string $role = 'member';
+
     public string $status = 'active';
+
     public $profilePhoto;
 
     // PSGC Address Fields
     public string $regionCode = '';
+
     public string $provinceCode = '';
+
     public string $cityCode = '';
+
     public string $barangayCode = '';
+
     public string $streetAddress = '';
+
+    public bool $leaderAssignmentLocked = false;
+
+    public array $ledSmallGroups = [];
 
     public function mount(User $user): void
     {
-        abort_if(auth()->user()?->hasRole(User::ROLE_MEMBER) && auth()->id() !== $user->id, 403);
+        Gate::authorize('users.update');
+        abort_unless(auth()->user()->canAccessMember($user), 403);
+        abort_if($user->isAdmin() && ! auth()->user()->isAdmin(), 403);
 
         $this->user = $user;
         $this->name = $user->name;
@@ -62,6 +85,12 @@ class UpdateUser extends Component
         $this->longitude = $user->longitude;
         $this->role = $user->role;
         $this->status = $user->status;
+        $this->ledSmallGroups = $user->ledSmallGroups()
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($group): array => ['id' => $group->id, 'name' => $group->name])
+            ->all();
+        $this->leaderAssignmentLocked = $user->isSmallGroupLeader() && count($this->ledSmallGroups) > 0;
     }
 
     /**
@@ -101,8 +130,8 @@ class UpdateUser extends Component
             'address' => ['nullable', 'string', 'max:500'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'role' => ['required', 'in:' . implode(',', User::ROLES)],
-            'status' => ['required', 'in:' . implode(',', User::STATUSES)],
+            'role' => ['required', 'in:'.implode(',', User::ROLES)],
+            'status' => ['required', 'in:'.implode(',', User::STATUSES)],
             'regionCode' => ['nullable', 'string'],
             'provinceCode' => ['nullable', 'string'],
             'cityCode' => ['nullable', 'string'],
@@ -113,7 +142,16 @@ class UpdateUser extends Component
 
     public function save(): void
     {
+        Gate::authorize('users.update');
+        abort_unless(auth()->user()->canAccessMember($this->user), 403);
+        abort_if($this->user->isAdmin() && ! auth()->user()->isAdmin(), 403);
         $validated = $this->validate();
+
+        $effectiveRole = Gate::allows('users.assign_roles') ? $validated['role'] : $this->user->role;
+        $removesGroupLeader = $this->user->isSmallGroupLeader()
+            && ($effectiveRole !== User::ROLE_SMALL_GROUP_LEADER || $validated['status'] !== User::STATUS_ACTIVE)
+            && $this->user->ledSmallGroups()->exists();
+        abort_if($removesGroupLeader, 422, 'Reassign this leader’s small groups before changing their role or status.');
 
         $data = [
             'name' => $validated['name'],
@@ -129,11 +167,19 @@ class UpdateUser extends Component
             'street_address' => $validated['streetAddress'] ?: null,
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
-            'role' => $validated['role'],
             'status' => $validated['status'],
         ];
 
-        if (!empty($validated['password'])) {
+        if (Gate::allows('users.assign_roles')) {
+            $removesFinalActiveAdmin = $this->user->isAdmin()
+                && $this->user->isActive()
+                && ($validated['role'] !== User::ROLE_ADMIN || $validated['status'] !== User::STATUS_ACTIVE)
+                && User::where('role', User::ROLE_ADMIN)->where('status', User::STATUS_ACTIVE)->count() <= 1;
+            abort_if($removesFinalActiveAdmin, 422, 'The final active administrator cannot be demoted or deactivated.');
+            $data['role'] = $validated['role'];
+        }
+
+        if (! empty($validated['password'])) {
             $data['password'] = Hash::make($validated['password']);
         }
 

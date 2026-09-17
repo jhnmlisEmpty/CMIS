@@ -4,6 +4,8 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -17,9 +19,13 @@ class User extends Authenticatable
      * Role constants
      */
     public const ROLE_ADMIN = 'admin';
+
     public const ROLE_PASTOR = 'pastor';
+
     public const ROLE_MINISTRY_HEAD = 'ministry_head';
+
     public const ROLE_SMALL_GROUP_LEADER = 'small_group_leader';
+
     public const ROLE_MEMBER = 'member';
 
     public const ROLES = [
@@ -34,6 +40,7 @@ class User extends Authenticatable
      * Status constants
      */
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_INACTIVE = 'inactive';
 
     public const STATUSES = [
@@ -45,6 +52,7 @@ class User extends Authenticatable
      * Gender constants
      */
     public const GENDER_MALE = 'male';
+
     public const GENDER_FEMALE = 'female';
 
     public const GENDERS = [
@@ -132,6 +140,61 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->hasRole(self::ROLE_ADMIN);
+    }
+
+    public function isSmallGroupLeader(): bool
+    {
+        return $this->hasRole(self::ROLE_SMALL_GROUP_LEADER);
+    }
+
+    /** Limit member records to the groups led by a small-group leader. */
+    public function scopeVisibleTo(Builder $query, ?User $viewer): Builder
+    {
+        if (! $viewer?->isSmallGroupLeader()) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $query) use ($viewer): void {
+            $query->whereKey($viewer->id)
+                ->orWhereHas('smallGroupMemberships.smallGroup', fn (Builder $groupQuery) => $groupQuery->where('leader_id', $viewer->id));
+        });
+    }
+
+    public function canAccessMember(User $member): bool
+    {
+        if (! $this->isSmallGroupLeader() || $this->is($member)) {
+            return true;
+        }
+
+        return $member->smallGroupMemberships()
+            ->whereHas('smallGroup', fn (Builder $query) => $query->where('leader_id', $this->id))
+            ->exists();
+    }
+
+    public function canAccessSmallGroup(SmallGroup $smallGroup): bool
+    {
+        return ! $this->isSmallGroupLeader() || $smallGroup->leader_id === $this->id;
+    }
+
+    /**
+     * Permissions granted to this user's role.
+     */
+    public function rolePermissions(): HasMany
+    {
+        return $this->hasMany(RolePermission::class, 'role', 'role');
+    }
+
+    public function hasPermission(string $permission): bool
+    {
+        if (! $this->isActive()) {
+            return false;
+        }
+
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->rolePermissions->contains('permission', $permission);
     }
 
     /**

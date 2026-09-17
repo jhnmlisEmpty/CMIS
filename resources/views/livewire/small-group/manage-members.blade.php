@@ -20,8 +20,8 @@
         <p>A member can belong to only one small group at a time.</p>
     </section>
 
-    <div class="group-members-grid">
-        <section class="event-checkin-panel" aria-labelledby="available-members-title">
+    <div @class(['group-members-grid', 'is-single' => Gate::denies('group_members.add') || auth()->user()->isSmallGroupLeader()])>
+        @if(Gate::allows('group_members.add') && ! auth()->user()->isSmallGroupLeader())<section class="event-checkin-panel" aria-labelledby="available-members-title">
             <div class="event-section-heading">
                 <div><span class="event-section-index">01</span><h2 id="available-members-title">Add a member</h2></div>
                 <span class="group-result-count">{{ $availableUsers->count() }} available</span>
@@ -53,7 +53,7 @@
                     <p>{{ $search ? 'Try searching with a different name or email address.' : 'All active members currently belong to a small group.' }}</p>
                 </div>
             @endif
-        </section>
+        </section>@endif
 
         <section class="event-attendance-panel" aria-labelledby="current-members-title">
             <div class="event-section-heading">
@@ -68,10 +68,10 @@
                             <div><strong>{{ $member->user->name }}</strong><small>{{ $member->user->email }} · Joined {{ $member->joined_at?->format('M j, Y') ?? '—' }}</small></div>
                             <span @class(['group-status', 'is-active' => $member->status === 'active'])><i></i>{{ ucfirst($member->status) }}</span>
                             <div class="event-row-actions">
-                                <button wire:click="toggleMemberStatus({{ $member->id }})" title="{{ $member->status === 'active' ? 'Deactivate member' : 'Activate member' }}" aria-label="{{ $member->status === 'active' ? 'Deactivate' : 'Activate' }} {{ $member->user->name }}">
+                                @can('group_members.update_status')<button wire:click="toggleMemberStatus({{ $member->id }})" title="{{ $member->status === 'active' ? 'Deactivate member' : 'Activate member' }}" aria-label="{{ $member->status === 'active' ? 'Deactivate' : 'Activate' }} {{ $member->user->name }}">
                                     @if($member->status === 'active')<x-heroicon-o-check-circle />@else<x-heroicon-o-exclamation-circle />@endif
-                                </button>
-                                <button wire:click="removeMember({{ $member->id }})" wire:confirm="Remove {{ $member->user->name }} from this group?" title="Remove member" aria-label="Remove {{ $member->user->name }}"><x-heroicon-o-trash /></button>
+                                </button>@endcan
+                                @can('group_members.remove')<button wire:click="removeMember({{ $member->id }})" wire:confirm="Remove {{ $member->user->name }} from this group?" title="Remove member" aria-label="Remove {{ $member->user->name }}"><x-heroicon-o-trash /></button>@endcan
                             </div>
                         </li>
                     @endforeach

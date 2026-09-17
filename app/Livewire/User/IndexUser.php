@@ -4,6 +4,7 @@ namespace App\Livewire\User;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -16,16 +17,27 @@ class IndexUser extends Component
     use WithPagination;
 
     public string $search = '';
+
     public string $roleFilter = '';
+
     public string $statusFilter = '';
+
     public string $smallGroupFilter = '';
+
     public string $locationFilter = '';
+
     public string $birthdateFrom = '';
+
     public string $birthdateTo = '';
+
     public string $minAge = '';
+
     public string $maxAge = '';
+
     public string $sortBy = 'created_at';
+
     public string $sortDirection = 'desc';
+
     public int $perPage = 10;
 
     protected $queryString = [
@@ -105,9 +117,13 @@ class IndexUser extends Component
 
     public function deleteUser(int $userId): void
     {
+        Gate::authorize('users.delete');
         $user = User::find($userId);
 
         if ($user && $user->id !== auth()->id()) {
+            abort_unless(auth()->user()->canAccessMember($user), 403);
+            abort_if($user->isAdmin() && ! auth()->user()->isAdmin(), 403);
+            abort_if($user->isAdmin() && User::where('role', User::ROLE_ADMIN)->where('status', User::STATUS_ACTIVE)->count() <= 1, 422, 'The final active administrator cannot be deleted.');
             $user->delete();
             session()->flash('success', 'User deleted successfully.');
         }
@@ -125,11 +141,11 @@ class IndexUser extends Component
         $query->whereNotNull('birthdate');
 
         if ($minAge !== null) {
-            $query->whereRaw($this->ageSqlExpression() . ' >= ?', [$minAge]);
+            $query->whereRaw($this->ageSqlExpression().' >= ?', [$minAge]);
         }
 
         if ($maxAge !== null) {
-            $query->whereRaw($this->ageSqlExpression() . ' <= ?', [$maxAge]);
+            $query->whereRaw($this->ageSqlExpression().' <= ?', [$maxAge]);
         }
     }
 
@@ -142,15 +158,16 @@ class IndexUser extends Component
         }
 
         if ($driver === 'pgsql') {
-            return "(EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)))";
+            return '(EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)))';
         }
 
-        return "(TIMESTAMPDIFF(YEAR, birthdate, CURDATE()))";
+        return '(TIMESTAMPDIFF(YEAR, birthdate, CURDATE()))';
     }
 
     public function render()
     {
         $users = User::query()
+            ->visibleTo(auth()->user())
             ->with(['smallGroups' => function ($query) {
                 $query->where('small_group_members.status', 'active')
                     ->where('small_groups.status', 'active');
@@ -192,7 +209,7 @@ class IndexUser extends Component
             'users' => $users,
             'roles' => User::ROLES,
             'statuses' => User::STATUSES,
-            'smallGroups' => \App\Models\SmallGroup::query()->active()->orderBy('name')->get(),
+            'smallGroups' => \App\Models\SmallGroup::query()->visibleTo(auth()->user())->active()->orderBy('name')->get(),
         ]);
     }
 }

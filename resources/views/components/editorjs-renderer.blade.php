@@ -2,17 +2,25 @@
 
 @php
 $blocks = [];
+$fallbackText = null;
 if ($content) {
     try {
         $data = is_string($content) ? json_decode($content, true) : $content;
-        $blocks = $data['blocks'] ?? [];
+        if (is_array($data)) {
+            $blocks = $data['blocks'] ?? [];
+        } elseif (is_string($content)) {
+            $fallbackText = $content;
+        }
     } catch (\Exception $e) {
-        $blocks = [];
+        $fallbackText = is_string($content) ? $content : null;
     }
 }
 @endphp
 
 <div {{ $attributes->merge(['class' => 'editorjs-content space-y-3 text-base']) }}>
+    @if($fallbackText)
+        <p class="text-gray-700 leading-relaxed whitespace-pre-line">{{ $fallbackText }}</p>
+    @else
     @forelse($blocks as $block)
         @switch($block['type'])
             @case('header')
@@ -71,5 +79,6 @@ if ($content) {
     @empty
         <p class="text-gray-400 italic">No content yet.</p>
     @endforelse
+    @endif
 </div>
 

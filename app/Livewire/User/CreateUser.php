@@ -3,6 +3,7 @@
 namespace App\Livewire\User;
 
 use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
@@ -19,24 +20,45 @@ class CreateUser extends Component
     use WithFileUploads;
 
     public string $name = '';
+
     public string $email = '';
+
     public string $password = '';
+
     public string $password_confirmation = '';
+
     public string $gender = '';
+
     public ?string $birthdate = null;
+
     public string $phone = '';
+
     public string $address = '';
+
     public ?float $latitude = null;
+
     public ?float $longitude = null;
+
     public string $role = 'member';
+
     public string $status = 'active';
+
     public $profilePhoto;
+
+    public function mount(): void
+    {
+        abort_if(auth()->user()->isSmallGroupLeader(), 403);
+    }
 
     // PSGC Address Fields
     public string $regionCode = '';
+
     public string $provinceCode = '';
+
     public string $cityCode = '';
+
     public string $barangayCode = '';
+
     public string $streetAddress = '';
 
     /**
@@ -76,8 +98,8 @@ class CreateUser extends Component
             'address' => ['nullable', 'string', 'max:500'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'role' => ['required', 'in:' . implode(',', User::ROLES)],
-            'status' => ['required', 'in:' . implode(',', User::STATUSES)],
+            'role' => ['required', 'in:'.implode(',', User::ROLES)],
+            'status' => ['required', 'in:'.implode(',', User::STATUSES)],
             'regionCode' => ['nullable', 'string'],
             'provinceCode' => ['nullable', 'string'],
             'cityCode' => ['nullable', 'string'],
@@ -88,6 +110,8 @@ class CreateUser extends Component
 
     public function save(): void
     {
+        Gate::authorize('users.create');
+        abort_if(auth()->user()->isSmallGroupLeader(), 403);
         $validated = $this->validate();
 
         $user = User::create([
@@ -107,7 +131,7 @@ class CreateUser extends Component
             'street_address' => $validated['streetAddress'] ?: null,
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
-            'role' => $validated['role'],
+            'role' => Gate::allows('users.assign_roles') ? $validated['role'] : User::ROLE_MEMBER,
             'status' => $validated['status'],
         ]);
 

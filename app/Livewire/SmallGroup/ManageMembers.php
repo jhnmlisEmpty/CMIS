@@ -5,6 +5,7 @@ namespace App\Livewire\SmallGroup;
 use App\Models\SmallGroup;
 use App\Models\SmallGroupMember;
 use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -14,19 +15,25 @@ use Livewire\Component;
 class ManageMembers extends Component
 {
     public SmallGroup $smallGroup;
+
     public string $search = '';
 
     public function mount(SmallGroup $smallGroup): void
     {
+        abort_unless(auth()->user()->canAccessSmallGroup($smallGroup), 403);
         $this->smallGroup = $smallGroup->load(['members.user']);
     }
 
     public function addMember(int $userId): void
     {
+        Gate::authorize('group_members.add');
+        abort_if(auth()->user()->isSmallGroupLeader(), 403);
+        abort_unless(auth()->user()->canAccessSmallGroup($this->smallGroup), 403);
         // Check if user exists
         $user = User::find($userId);
-        if (!$user) {
+        if (! $user) {
             session()->flash('error', 'User not found.');
+
             return;
         }
 
@@ -40,6 +47,7 @@ class ManageMembers extends Component
                 $groupName = $existingMembership->smallGroup->name ?? 'another group';
                 session()->flash('error', "This user is already a member of \"{$groupName}\". A user can only belong to one small group.");
             }
+
             return;
         }
 
@@ -56,8 +64,10 @@ class ManageMembers extends Component
 
     public function removeMember(int $memberId): void
     {
+        Gate::authorize('group_members.remove');
+        abort_unless(auth()->user()->canAccessSmallGroup($this->smallGroup), 403);
         $member = SmallGroupMember::find($memberId);
-        
+
         if ($member && $member->small_group_id === $this->smallGroup->id) {
             $member->delete();
             $this->smallGroup->refresh();
@@ -67,12 +77,14 @@ class ManageMembers extends Component
 
     public function toggleMemberStatus(int $memberId): void
     {
+        Gate::authorize('group_members.update_status');
+        abort_unless(auth()->user()->canAccessSmallGroup($this->smallGroup), 403);
         $member = SmallGroupMember::find($memberId);
-        
+
         if ($member && $member->small_group_id === $this->smallGroup->id) {
             $member->update([
-                'status' => $member->status === SmallGroupMember::STATUS_ACTIVE 
-                    ? SmallGroupMember::STATUS_INACTIVE 
+                'status' => $member->status === SmallGroupMember::STATUS_ACTIVE
+                    ? SmallGroupMember::STATUS_INACTIVE
                     : SmallGroupMember::STATUS_ACTIVE,
             ]);
             $this->smallGroup->refresh();
@@ -84,15 +96,15 @@ class ManageMembers extends Component
         // Get ALL users who are already members of ANY small group
         $usersInAnyGroup = SmallGroupMember::pluck('user_id')->toArray();
 
-        $availableUsers = User::query()
+        $availableUsers = Gate::allows('group_members.add') && ! auth()->user()->isSmallGroupLeader() ? User::query()
             ->whereNotIn('id', $usersInAnyGroup)
-            ->when($this->search, fn($query) => $query->where(function($q) {
+            ->when($this->search, fn ($query) => $query->where(function ($q) {
                 $q->where('name', 'like', "%{$this->search}%")
-                  ->orWhere('email', 'like', "%{$this->search}%");
+                    ->orWhere('email', 'like', "%{$this->search}%");
             }))
             ->orderBy('name')
             ->limit(20)
-            ->get();
+            ->get() : collect();
 
         return view('livewire.small-group.manage-members', [
             'availableUsers' => $availableUsers,

@@ -1,7 +1,9 @@
 <?php
+
 namespace App\Livewire\Attendance;
 
 use App\Models\Event;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -13,10 +15,15 @@ use Livewire\WithPagination;
 class IndexEvent extends Component
 {
     use WithPagination;
+
     public string $search = '';
+
     public string $typeFilter = '';
+
     public string $sortBy = 'event_date';
+
     public string $sortDirection = 'desc';
+
     public int $perPage = 10;
 
     protected $queryString = [
@@ -54,6 +61,7 @@ class IndexEvent extends Component
 
     public function deleteEvent(int $eventId): void
     {
+        Gate::authorize('events.delete');
         $event = Event::find($eventId);
         if ($event) {
             $event->delete();
@@ -66,9 +74,9 @@ class IndexEvent extends Component
         $events = Event::query()
             ->when($this->search, function ($query) {
                 $query->where('title', 'like', "%{$this->search}%")
-                      ->orWhere('location', 'like', "%{$this->search}%");
+                    ->orWhere('location', 'like', "%{$this->search}%");
             })
-            ->when($this->typeFilter, fn($query) => $query->where('event_type', $this->typeFilter))
+            ->when($this->typeFilter, fn ($query) => $query->where('event_type', $this->typeFilter))
             ->orderBy($this->sortBy, $this->sortDirection)
             ->paginate($this->perPage);
 

@@ -8,14 +8,14 @@
         :backRoute="route('events.index')"
         backLabel="Events">
         <x-slot:actions>
-            <a href="{{ route('events.update', $event->id) }}" class="event-button-secondary" wire:navigate>
+            @can('events.update')<a href="{{ route('events.update', $event->id) }}" class="event-button-secondary" wire:navigate>
                 <x-heroicon-o-pencil-square aria-hidden="true" />
                 Edit event
-            </a>
+            </a>@endcan
         </x-slot:actions>
     </x-page-header>
 
-    <input type="hidden" wire:model="scannedUuid" @keydown.enter="$wire.handleQrScan()" id="qr-input">
+    @can('attendance.record')<input type="hidden" wire:model="scannedUuid" @keydown.enter="$wire.handleQrScan()" id="qr-input">@endcan
 
     @if($message)
         <div @class(['event-alert', 'event-alert-success' => $messageType === 'success', 'event-alert-error' => $messageType !== 'success']) role="status">
@@ -64,7 +64,7 @@
         </section>
     @endif
 
-    <div class="event-detail-grid">
+    @can('attendance.record')<div class="event-detail-grid">
         <section class="event-checkin-panel" aria-labelledby="checkin-title">
             <div class="event-section-heading">
                 <div>
@@ -127,7 +127,7 @@
                 <div><dt>Peak hour</dt><dd>{{ $stats['peakHour'] ?? '—' }}</dd></div>
             </dl>
         </aside>
-    </div>
+    </div>@endcan
 
     @if($attendances->count() > 0)
         <section class="event-analytics-panel" aria-labelledby="attendance-trend-title">
@@ -192,7 +192,7 @@
                                 <td>@if($attendance->user->smallGroups->count() > 0)<span class="event-type-badge">{{ $attendance->user->smallGroups->first()->name }}</span>@else<span class="event-muted">No group</span>@endif</td>
                                 <td>{{ $attendance->user->phone ?: '—' }}</td>
                                 <td><time datetime="{{ $attendance->check_in_time->toIso8601String() }}"><strong>{{ $attendance->check_in_time->format('M j, Y') }}</strong><small>{{ $attendance->check_in_time->format('g:i A') }}</small></time></td>
-                                <td><a href="{{ route('users.show', $attendance->user->id) }}" class="event-icon-button" wire:navigate title="View member" aria-label="View {{ $attendance->user->name }}"><x-heroicon-o-chevron-right /></a></td>
+                                <td>@can('users.view')<a href="{{ route('users.show', $attendance->user->id) }}" class="event-icon-button" wire:navigate title="View member" aria-label="View {{ $attendance->user->name }}"><x-heroicon-o-chevron-right /></a>@endcan</td>
                             </tr>
                         @endforeach
                     </tbody>

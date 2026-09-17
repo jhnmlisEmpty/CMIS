@@ -5,6 +5,7 @@ namespace App\Livewire\SmallGroup;
 use App\Models\SmallGroup;
 use App\Models\SmallGroupLesson;
 use App\Models\SmallGroupMemberProgress;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -18,11 +19,17 @@ class ManageLessons extends Component
 
     // Form fields
     public bool $showForm = false;
+
     public ?int $editingLessonId = null;
+
     public string $title = '';
+
     public string $description = '';
+
     public int $order = 1;
+
     public string $content = '';
+
     public string $status = 'draft';
 
     // View lesson
@@ -50,12 +57,13 @@ class ManageLessons extends Component
             'description' => ['nullable', 'string', 'max:500'],
             'order' => ['required', 'integer', 'min:1'],
             'content' => ['nullable', 'string'],
-            'status' => ['required', 'in:' . implode(',', SmallGroupLesson::STATUSES)],
+            'status' => ['required', 'in:'.implode(',', SmallGroupLesson::STATUSES)],
         ];
     }
 
     public function showCreateForm(): void
     {
+        Gate::authorize('lessons.create');
         $this->resetForm();
         $this->order = $this->smallGroup->lessons->count() + 1;
         $this->showForm = true;
@@ -63,8 +71,9 @@ class ManageLessons extends Component
 
     public function editLesson(int $lessonId): void
     {
+        Gate::authorize('lessons.update');
         $lesson = SmallGroupLesson::find($lessonId);
-        
+
         if ($lesson && $lesson->small_group_id === $this->smallGroup->id) {
             $this->editingLessonId = $lesson->id;
             $this->title = $lesson->title;
@@ -78,8 +87,8 @@ class ManageLessons extends Component
 
     public function viewLesson(int $lessonId): void
     {
-        $lesson = SmallGroupLesson::with(['progress.member.user'])->find($lessonId);
-        
+        $lesson = SmallGroupLesson::with(Gate::allows('lesson_progress.view') ? ['progress.member.user'] : [])->find($lessonId);
+
         if ($lesson && $lesson->small_group_id === $this->smallGroup->id) {
             $this->viewingLesson = $lesson;
         }
@@ -95,12 +104,20 @@ class ManageLessons extends Component
         $validated = $this->validate();
 
         if ($this->editingLessonId) {
+            Gate::authorize('lessons.update');
             $lesson = SmallGroupLesson::find($this->editingLessonId);
             if ($lesson && $lesson->small_group_id === $this->smallGroup->id) {
+                if ($lesson->status !== $validated['status']) {
+                    Gate::authorize('lessons.publish');
+                }
                 $lesson->update($validated);
                 session()->flash('success', 'Lesson updated successfully.');
             }
         } else {
+            Gate::authorize('lessons.create');
+            if ($validated['status'] === SmallGroupLesson::STATUS_PUBLISHED) {
+                Gate::authorize('lessons.publish');
+            }
             SmallGroupLesson::create([
                 'small_group_id' => $this->smallGroup->id,
                 ...$validated,
@@ -114,8 +131,9 @@ class ManageLessons extends Component
 
     public function deleteLesson(int $lessonId): void
     {
+        Gate::authorize('lessons.delete');
         $lesson = SmallGroupLesson::find($lessonId);
-        
+
         if ($lesson && $lesson->small_group_id === $this->smallGroup->id) {
             $lesson->delete();
             $this->smallGroup->refresh();
@@ -141,6 +159,10 @@ class ManageLessons extends Component
 
     public function updateMemberProgress(int $memberId, int $lessonId, string $status): void
     {
+        Gate::authorize('lesson_progress.update');
+        abort_unless(in_array($status, SmallGroupMemberProgress::STATUSES, true), 422);
+        abort_unless($this->smallGroup->members()->whereKey($memberId)->exists(), 404);
+        abort_unless($this->smallGroup->lessons()->whereKey($lessonId)->exists(), 404);
         $progress = SmallGroupMemberProgress::firstOrNew([
             'small_group_member_id' => $memberId,
             'small_group_lesson_id' => $lessonId,

@@ -80,11 +80,11 @@
                         <label for="password_confirmation">Confirm password <span aria-hidden="true">*</span></label><p class="event-field-hint">Repeat the password exactly.</p>
                         <input type="password" id="password_confirmation" wire:model="password_confirmation" placeholder="Confirm password" autocomplete="new-password">
                     </div>
-                    <div class="event-field">
+                    @can('users.assign_roles')<div class="event-field">
                         <label for="role">Role <span aria-hidden="true">*</span></label><p class="event-field-hint">Controls access and responsibilities.</p>
                         <select id="role" wire:model="role" class="@error('role') is-invalid @enderror">@foreach($roles as $role)<option value="{{ $role }}">{{ ucwords(str_replace('_', ' ', $role)) }}</option>@endforeach</select>
                         @error('role')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
-                    </div>
+                    </div>@endcan
                     <div class="event-field">
                         <label for="status">Status <span aria-hidden="true">*</span></label><p class="event-field-hint">Only active members can use the system.</p>
                         <select id="status" wire:model="status" class="@error('status') is-invalid @enderror">@foreach($statuses as $status)<option value="{{ $status }}">{{ ucfirst($status) }}</option>@endforeach</select>

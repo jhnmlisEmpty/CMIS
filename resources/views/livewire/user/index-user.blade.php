@@ -4,8 +4,8 @@
 
     <x-page-header title="Members" subtitle="Manage member profiles, contact information, and account access.">
         <x-slot:actions>
-            <a href="{{ route('users.export', ['search' => $search, 'roleFilter' => $roleFilter, 'statusFilter' => $statusFilter, 'smallGroupFilter' => $smallGroupFilter, 'locationFilter' => $locationFilter, 'birthdateFrom' => $birthdateFrom, 'birthdateTo' => $birthdateTo, 'minAge' => $minAge, 'maxAge' => $maxAge, 'sortBy' => $sortBy, 'sortDirection' => $sortDirection]) }}" class="event-button-secondary"><x-heroicon-o-arrow-down-tray aria-hidden="true" />Export list</a>
-            <a href="{{ route('users.create') }}" class="event-button-primary" wire:navigate><x-heroicon-o-plus aria-hidden="true" />New member</a>
+            @can('users.export')<a href="{{ route('users.export', ['search' => $search, 'roleFilter' => $roleFilter, 'statusFilter' => $statusFilter, 'smallGroupFilter' => $smallGroupFilter, 'locationFilter' => $locationFilter, 'birthdateFrom' => $birthdateFrom, 'birthdateTo' => $birthdateTo, 'minAge' => $minAge, 'maxAge' => $maxAge, 'sortBy' => $sortBy, 'sortDirection' => $sortDirection]) }}" class="event-button-secondary"><x-heroicon-o-arrow-down-tray aria-hidden="true" />Export list</a>@endcan
+            @if(Gate::allows('users.create') && ! auth()->user()->isSmallGroupLeader())<a href="{{ route('users.create') }}" class="event-button-primary" wire:navigate><x-heroicon-o-plus aria-hidden="true" />New member</a>@endif
         </x-slot:actions>
     </x-page-header>
 
@@ -59,12 +59,12 @@
                     <div><span @class(['group-status', 'is-active' => $user->status === 'active'])><i></i>{{ ucfirst($user->status) }}</span></div>
                     <div class="event-row-actions">
                         <a href="{{ route('users.show', $user) }}" title="Open member" aria-label="Open {{ $user->name }}" wire:navigate><x-heroicon-o-chevron-right /></a>
-                        <a href="{{ route('users.edit', $user) }}" title="Edit member" aria-label="Edit {{ $user->name }}" wire:navigate><x-heroicon-o-pencil-square /></a>
-                        @if($user->id !== auth()->id())<button wire:click="deleteUser({{ $user->id }})" wire:confirm="Delete {{ $user->name }}? This cannot be undone." title="Delete member" aria-label="Delete {{ $user->name }}"><x-heroicon-o-trash /></button>@endif
+                        @can('users.update')<a href="{{ route('users.edit', $user) }}" title="Edit member" aria-label="Edit {{ $user->name }}" wire:navigate><x-heroicon-o-pencil-square /></a>@endcan
+                        @can('users.delete')@if($user->id !== auth()->id())<button wire:click="deleteUser({{ $user->id }})" wire:confirm="Delete {{ $user->name }}? This cannot be undone." title="Delete member" aria-label="Delete {{ $user->name }}"><x-heroicon-o-trash /></button>@endif@endcan
                     </div>
                 </article>
             @empty
-                <div class="event-empty-state"><span class="event-empty-icon"><x-heroicon-o-user-plus /></span><h3>{{ $search || $roleFilter || $statusFilter || $smallGroupFilter || $locationFilter || $birthdateFrom || $birthdateTo || $minAge || $maxAge ? 'No matching members' : 'Your member directory is ready' }}</h3><p>{{ $search || $roleFilter || $statusFilter || $smallGroupFilter || $locationFilter || $birthdateFrom || $birthdateTo || $minAge || $maxAge ? 'Try another search or clear the filters to see every member.' : 'Add the first member to begin building the church directory.' }}</p>@if($search || $roleFilter || $statusFilter || $smallGroupFilter || $locationFilter || $birthdateFrom || $birthdateTo || $minAge || $maxAge)<button wire:click="clearFilters" class="event-button-secondary">Clear filters</button>@else<a href="{{ route('users.create') }}" class="event-button-primary" wire:navigate>Add a member</a>@endif</div>
+                <div class="event-empty-state"><span class="event-empty-icon"><x-heroicon-o-user-plus /></span><h3>{{ $search || $roleFilter || $statusFilter || $smallGroupFilter || $locationFilter || $birthdateFrom || $birthdateTo || $minAge || $maxAge ? 'No matching members' : 'Your member directory is ready' }}</h3><p>{{ $search || $roleFilter || $statusFilter || $smallGroupFilter || $locationFilter || $birthdateFrom || $birthdateTo || $minAge || $maxAge ? 'Try another search or clear the filters to see every member.' : 'No members are currently assigned to your accessible groups.' }}</p>@if($search || $roleFilter || $statusFilter || $smallGroupFilter || $locationFilter || $birthdateFrom || $birthdateTo || $minAge || $maxAge)<button wire:click="clearFilters" class="event-button-secondary">Clear filters</button>@elseif(Gate::allows('users.create') && ! auth()->user()->isSmallGroupLeader())<a href="{{ route('users.create') }}" class="event-button-primary" wire:navigate>Add a member</a>@endif</div>
             @endforelse
         </div>
         @if($users->hasPages())<div class="event-pagination">{{ $users->links() }}</div>@endif

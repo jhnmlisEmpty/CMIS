@@ -8,10 +8,10 @@
         :backRoute="route('small-groups.index')"
         backLabel="Small groups">
         <x-slot:actions>
-            <a href="{{ route('small-groups.edit', $smallGroup) }}" class="event-button-secondary" wire:navigate>
+            @can('small_groups.update')<a href="{{ route('small-groups.edit', $smallGroup) }}" class="event-button-secondary" wire:navigate>
                 <x-heroicon-o-pencil-square aria-hidden="true" />
                 Edit group
-            </a>
+            </a>@endcan
         </x-slot:actions>
     </x-page-header>
 
@@ -51,22 +51,22 @@
         <aside class="group-actions-panel" aria-labelledby="group-actions-title">
             <div class="event-section-heading"><div><span class="event-section-index">02</span><h2 id="group-actions-title">Group workspace</h2></div></div>
             <div class="group-workspace-links">
-                <a href="{{ route('small-groups.members', $smallGroup) }}" wire:navigate>
+                @can('group_members.view')<a href="{{ route('small-groups.members', $smallGroup) }}" wire:navigate>
                     <span><x-heroicon-o-user-group aria-hidden="true" /></span>
                     <div><strong>Manage members</strong><small>Add, remove, or update status</small></div>
                     <x-heroicon-o-chevron-right aria-hidden="true" />
-                </a>
-                <a href="{{ route('small-groups.lessons', $smallGroup) }}" wire:navigate>
+                </a>@endcan
+                @can('lessons.view')<a href="{{ route('lessons.index') }}" wire:navigate>
                     <span><x-heroicon-o-book-open aria-hidden="true" /></span>
                     <div><strong>Manage lessons</strong><small>Build and organize the curriculum</small></div>
                     <x-heroicon-o-chevron-right aria-hidden="true" />
-                </a>
+                </a>@endcan
             </div>
         </aside>
     </div>
 
     <div class="group-content-grid">
-        <section class="event-attendance-panel" aria-labelledby="group-members-title">
+        @can('group_members.view')<section class="event-attendance-panel" aria-labelledby="group-members-title">
             <div class="event-section-heading">
                 <div><span class="event-section-index">03</span><h2 id="group-members-title">Members</h2></div>
                 <a href="{{ route('small-groups.members', $smallGroup) }}" class="group-section-link" wire:navigate>Manage <span aria-hidden="true">→</span></a>
@@ -84,12 +84,12 @@
             @else
                 <div class="event-empty-state event-empty-compact"><span class="event-empty-icon"><x-heroicon-o-user-plus /></span><h3>No members yet</h3><p>Add the first member to begin building this community.</p><a href="{{ route('small-groups.members', $smallGroup) }}" class="event-button-secondary" wire:navigate>Add members</a></div>
             @endif
-        </section>
+        </section>@endcan
 
-        <section class="event-attendance-panel" aria-labelledby="group-lessons-title">
+        @can('lessons.view')<section class="event-attendance-panel" aria-labelledby="group-lessons-title">
             <div class="event-section-heading">
                 <div><span class="event-section-index">04</span><h2 id="group-lessons-title">Lessons</h2></div>
-                <a href="{{ route('small-groups.lessons', $smallGroup) }}" class="group-section-link" wire:navigate>Manage <span aria-hidden="true">→</span></a>
+                <a href="{{ route('lessons.index') }}" class="group-section-link" wire:navigate>Manage <span aria-hidden="true">→</span></a>
             </div>
             @if($smallGroup->lessons->count() > 0)
                 <ol class="group-lesson-list">
@@ -97,19 +97,19 @@
                         @php $totalMembers = $smallGroup->members->count(); $completedCount = $lesson->progress->where('status', 'completed')->count(); @endphp
                         <li>
                             <span class="group-lesson-number">{{ str_pad($lesson->order, 2, '0', STR_PAD_LEFT) }}</span>
-                            <div><a href="{{ route('small-groups.lessons.show', [$smallGroup, $lesson]) }}" wire:navigate>{{ $lesson->title }}</a><small>{{ $lesson->description ?: 'No description' }}</small></div>
+                            <div><a href="{{ route('lessons.show', $lesson) }}?group={{ $smallGroup->id }}" wire:navigate>{{ $lesson->title }}</a><small>{{ $lesson->description ?: 'No description' }}</small></div>
                             <span class="group-lesson-progress">{{ $completedCount }}/{{ $totalMembers }} complete</span>
                             <div class="event-row-actions">
-                                <a href="{{ route('small-groups.lessons.show', [$smallGroup, $lesson]) }}" title="Open lesson" wire:navigate><x-heroicon-o-chevron-right /></a>
-                                <a href="{{ route('small-groups.lessons', $smallGroup) }}?edit={{ $lesson->id }}" title="Edit lesson" wire:navigate><x-heroicon-o-pencil-square /></a>
-                                <button wire:click="deleteLesson({{ $lesson->id }})" wire:confirm="Delete {{ $lesson->title }}?" title="Delete lesson"><x-heroicon-o-trash /></button>
+                                <a href="{{ route('lessons.show', $lesson) }}?group={{ $smallGroup->id }}" title="Open lesson" wire:navigate><x-heroicon-o-chevron-right /></a>
+                                @can('lessons.update')<a href="{{ route('lessons.index') }}?edit={{ $lesson->id }}" title="Edit lesson" wire:navigate><x-heroicon-o-pencil-square /></a>@endcan
+                                @can('lessons.delete')<button wire:click="deleteLesson({{ $lesson->id }})" wire:confirm="Delete {{ $lesson->title }}?" title="Delete lesson"><x-heroicon-o-trash /></button>@endcan
                             </div>
                         </li>
                     @endforeach
                 </ol>
             @else
-                <div class="event-empty-state event-empty-compact"><span class="event-empty-icon"><x-heroicon-o-book-open /></span><h3>No lessons yet</h3><p>Create the first lesson and start organizing the group curriculum.</p><a href="{{ route('small-groups.lessons', $smallGroup) }}" class="event-button-secondary" wire:navigate>Create lessons</a></div>
+                <div class="event-empty-state event-empty-compact"><span class="event-empty-icon"><x-heroicon-o-book-open /></span><h3>No lessons yet</h3><p>Build the shared curriculum for every cell group.</p><a href="{{ route('lessons.index') }}" class="event-button-secondary" wire:navigate>Open lessons</a></div>
             @endif
-        </section>
+        </section>@endcan
     </div>
 </div>

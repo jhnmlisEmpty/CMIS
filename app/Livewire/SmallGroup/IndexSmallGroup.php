@@ -3,6 +3,7 @@
 namespace App\Livewire\SmallGroup;
 
 use App\Models\SmallGroup;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -15,9 +16,13 @@ class IndexSmallGroup extends Component
     use WithPagination;
 
     public string $search = '';
+
     public string $statusFilter = '';
+
     public string $sortBy = 'name';
+
     public string $sortDirection = 'asc';
+
     public int $perPage = 10;
 
     protected $queryString = [
@@ -55,9 +60,11 @@ class IndexSmallGroup extends Component
 
     public function deleteSmallGroup(int $id): void
     {
+        Gate::authorize('small_groups.delete');
         $smallGroup = SmallGroup::find($id);
-        
+
         if ($smallGroup) {
+            abort_unless(auth()->user()->canAccessSmallGroup($smallGroup), 403);
             $smallGroup->delete();
             session()->flash('success', 'Small Group deleted successfully.');
         }
@@ -66,15 +73,16 @@ class IndexSmallGroup extends Component
     public function render()
     {
         $smallGroups = SmallGroup::query()
+            ->visibleTo(auth()->user())
             ->with(['leader', 'members'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('name', 'like', "%{$this->search}%")
-                      ->orWhere('description', 'like', "%{$this->search}%")
-                      ->orWhereHas('leader', fn($q) => $q->where('name', 'like', "%{$this->search}%"));
+                        ->orWhere('description', 'like', "%{$this->search}%")
+                        ->orWhereHas('leader', fn ($q) => $q->where('name', 'like', "%{$this->search}%"));
                 });
             })
-            ->when($this->statusFilter, fn($query) => $query->where('status', $this->statusFilter))
+            ->when($this->statusFilter, fn ($query) => $query->where('status', $this->statusFilter))
             ->orderBy($this->sortBy, $this->sortDirection)
             ->paginate($this->perPage);
 
