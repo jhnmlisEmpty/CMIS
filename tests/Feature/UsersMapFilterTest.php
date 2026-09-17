@@ -16,6 +16,9 @@ class UsersMapFilterTest extends TestCase
 
     public function test_map_filters_use_the_same_filtered_members_as_the_markers(): void
     {
+        $admin = User::factory()->admin()->create(['latitude' => null, 'longitude' => null]);
+        $this->actingAs($admin);
+
         $leader = User::factory()->create([
             'latitude' => null,
             'longitude' => null,

@@ -5,6 +5,7 @@ namespace App\Livewire\Components;
 use App\Models\SmallGroup;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
@@ -57,6 +58,7 @@ class UsersMap extends Component
         string $height = '500px',
         string $statusFilter = 'active'
     ): void {
+        Gate::authorize('users.map');
         $this->showFilters = $showFilters;
         $this->showLegend = $showLegend;
         $this->showMemberList = $showMemberList;
@@ -67,6 +69,7 @@ class UsersMap extends Component
     public function getFilteredUsersProperty()
     {
         return User::query()
+            ->visibleTo(auth()->user())
             ->with(['smallGroups' => function ($query) {
                 $query->where('small_group_members.status', 'active')
                     ->where('small_groups.status', 'active');
@@ -209,8 +212,8 @@ class UsersMap extends Component
             'usersForMap' => $this->usersForMap,
             'roles' => User::ROLES,
             'statuses' => User::STATUSES,
-            'smallGroups' => SmallGroup::query()->active()->orderBy('name')->get(),
-            'totalWithLocation' => User::whereNotNull('latitude')->whereNotNull('longitude')->count(),
+            'smallGroups' => SmallGroup::query()->visibleTo(auth()->user())->active()->orderBy('name')->get(),
+            'totalWithLocation' => User::query()->visibleTo(auth()->user())->whereNotNull('latitude')->whereNotNull('longitude')->count(),
         ]);
     }
 }

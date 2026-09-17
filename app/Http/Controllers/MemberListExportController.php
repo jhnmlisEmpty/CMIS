@@ -26,6 +26,7 @@ class MemberListExportController extends Controller
         $sortDirection = strtolower((string) $request->query('sortDirection', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $users = User::query()
+            ->visibleTo($request->user())
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")

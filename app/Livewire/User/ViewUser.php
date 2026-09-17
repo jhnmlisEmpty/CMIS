@@ -3,6 +3,7 @@
 namespace App\Livewire\User;
 
 use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -17,7 +18,10 @@ class ViewUser extends Component
     {
         $user ??= auth()->user();
 
-        abort_if(auth()->user()?->hasRole(User::ROLE_MEMBER) && auth()->id() !== $user->id, 403);
+        if (auth()->id() !== $user->id) {
+            Gate::authorize('users.view');
+            abort_unless(auth()->user()->canAccessMember($user), 403);
+        }
 
         $this->user = $user;
     }

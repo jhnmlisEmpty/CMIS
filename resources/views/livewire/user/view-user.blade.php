@@ -8,7 +8,7 @@
         :backRoute="auth()->id() === $user->id ? route('profile') : route('users.index')"
         :backLabel="auth()->id() === $user->id ? 'My profile' : 'Members'">
         <x-slot:actions>
-            <a href="{{ auth()->id() === $user->id ? route('profile.edit') : route('users.edit', $user) }}" class="event-button-secondary" wire:navigate><x-heroicon-o-pencil-square />{{ auth()->id() === $user->id ? 'Edit my profile' : 'Edit member' }}</a>
+            @if(auth()->id() === $user->id)<a href="{{ route('profile.edit') }}" class="event-button-secondary" wire:navigate><x-heroicon-o-pencil-square />Edit my profile</a>@else @can('users.update')<a href="{{ route('users.edit', $user) }}" class="event-button-secondary" wire:navigate><x-heroicon-o-pencil-square />Edit member</a>@endcan @endif
             @if(auth()->id() === $user->id)
                 <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="event-button-secondary profile-logout-button"><x-heroicon-o-arrow-left-start-on-rectangle />Log out</button></form>
             @endif
@@ -75,7 +75,7 @@
                 </div>
             </div>
         @else
-            <div class="event-empty-state event-empty-compact"><span class="event-empty-icon"><x-heroicon-o-map-pin /></span><h3>No location recorded</h3><p>Edit this member to add an address and map position.</p><a href="{{ auth()->id() === $user->id ? route('profile.edit') : route('users.edit', $user) }}" class="event-button-secondary" wire:navigate>Add location</a></div>
+            <div class="event-empty-state event-empty-compact"><span class="event-empty-icon"><x-heroicon-o-map-pin /></span><h3>No location recorded</h3><p>Edit this member to add an address and map position.</p>@if(auth()->id() === $user->id)<a href="{{ route('profile.edit') }}" class="event-button-secondary" wire:navigate>Add location</a>@else @can('users.update')<a href="{{ route('users.edit', $user) }}" class="event-button-secondary" wire:navigate>Add location</a>@endcan @endif</div>
         @endif
     </section>
 </div>

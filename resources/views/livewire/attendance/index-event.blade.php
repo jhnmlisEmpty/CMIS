@@ -4,10 +4,10 @@
 
     <x-page-header title="Events" subtitle="Plan gatherings and manage attendance from one place.">
         <x-slot:actions>
-            <a href="{{ route('events.create') }}" class="event-button-primary" wire:navigate>
+            @can('events.create')<a href="{{ route('events.create') }}" class="event-button-primary" wire:navigate>
                 <x-heroicon-o-plus aria-hidden="true" />
                 New event
-            </a>
+            </a>@endcan
         </x-slot:actions>
     </x-page-header>
 
@@ -65,7 +65,7 @@
                     $eventDate = \Illuminate\Support\Carbon::parse($event->event_date);
                 @endphp
                 <article class="event-row">
-                    <a href="{{ route('events.view', $event->id) }}" class="event-title-cell" wire:navigate>
+                    @can('attendance.view')<a href="{{ route('events.view', $event->id) }}" class="event-title-cell" wire:navigate>@else<div class="event-title-cell">@endcan
                         <span class="event-date-tile" aria-hidden="true">
                             <strong>{{ $eventDate->format('d') }}</strong>
                             <small>{{ $eventDate->format('M') }}</small>
@@ -74,7 +74,7 @@
                             <strong>{{ $event->title }}</strong>
                             <small>#{{ str_pad($event->id, 4, '0', STR_PAD_LEFT) }}</small>
                         </span>
-                    </a>
+                    @can('attendance.view')</a>@else</div>@endcan
                     <time datetime="{{ $eventDate->format('Y-m-d') }}">
                         <strong>{{ $eventDate->format('M j, Y') }}</strong>
                         <small>{{ $eventDate->isPast() ? 'Past event' : $eventDate->diffForHumans() }}</small>
@@ -85,15 +85,15 @@
                     </div>
                     <div><span class="event-type-badge">{{ ucfirst($event->event_type) }}</span></div>
                     <div class="event-row-actions">
-                        <a href="{{ route('events.view', $event->id) }}" title="Open event" aria-label="Open {{ $event->title }}" wire:navigate>
+                        @can('attendance.view')<a href="{{ route('events.view', $event->id) }}" title="Open event" aria-label="Open {{ $event->title }}" wire:navigate>
                             <x-heroicon-o-chevron-right />
-                        </a>
-                        <a href="{{ route('events.update', $event->id) }}" title="Edit event" aria-label="Edit {{ $event->title }}" wire:navigate>
+                        </a>@endcan
+                        @can('events.update')<a href="{{ route('events.update', $event->id) }}" title="Edit event" aria-label="Edit {{ $event->title }}" wire:navigate>
                             <x-heroicon-o-pencil-square />
-                        </a>
-                        <button wire:click="deleteEvent({{ $event->id }})" wire:confirm="Delete {{ $event->title }}? This cannot be undone." title="Delete event" aria-label="Delete {{ $event->title }}">
+                        </a>@endcan
+                        @can('events.delete')<button wire:click="deleteEvent({{ $event->id }})" wire:confirm="Delete {{ $event->title }}? This cannot be undone." title="Delete event" aria-label="Delete {{ $event->title }}">
                             <x-heroicon-o-trash />
-                        </button>
+                        </button>@endcan
                     </div>
                 </article>
             @empty
@@ -106,7 +106,7 @@
                     @if($search || $typeFilter)
                         <button wire:click="clearFilters" class="event-button-secondary">Clear filters</button>
                     @else
-                        <a href="{{ route('events.create') }}" class="event-button-primary" wire:navigate>Create an event</a>
+                        @can('events.create')<a href="{{ route('events.create') }}" class="event-button-primary" wire:navigate>Create an event</a>@endcan
                     @endif
                 </div>
             @endforelse

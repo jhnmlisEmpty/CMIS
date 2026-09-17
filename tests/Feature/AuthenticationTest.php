@@ -29,7 +29,7 @@ class AuthenticationTest extends TestCase
             'birthdate' => '1991-04-17',
         ]);
 
-        $response->assertRedirect(route('home'));
+        $response->assertRedirect(route('profile'));
         $this->assertAuthenticatedAs($user);
     }
 

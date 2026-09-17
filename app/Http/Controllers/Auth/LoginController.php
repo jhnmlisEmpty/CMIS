@@ -56,7 +56,9 @@ class LoginController extends Controller
         Auth::login($matches->first(), $request->boolean('remember'));
         $request->session()->regenerate();
 
-        return redirect()->intended(route('home'));
+        $destination = $matches->first()->can('dashboard.view') ? route('home') : route('profile');
+
+        return redirect()->intended($destination);
     }
 
     public function destroy(Request $request): RedirectResponse

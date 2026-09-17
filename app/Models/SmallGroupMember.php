@@ -71,7 +71,7 @@ class SmallGroupMember extends Model
      */
     public function progressForLesson(int $lessonId): ?SmallGroupMemberProgress
     {
-        return $this->progress()->where('small_group_lesson_id', $lessonId)->first();
+        return $this->progress()->where('lesson_id', $lessonId)->first();
     }
 
     /**

@@ -3,7 +3,8 @@
 namespace App\Livewire\SmallGroup;
 
 use App\Models\SmallGroup;
-use App\Models\SmallGroupLesson;
+use App\Models\Lesson;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -16,21 +17,23 @@ class ViewSmallGroup extends Component
 
     public function mount(SmallGroup $smallGroup): void
     {
-        $this->smallGroup = $smallGroup->load(['leader', 'members.user', 'lessons.progress']);
+        abort_unless(auth()->user()->canAccessSmallGroup($smallGroup), 403);
+        $this->smallGroup = $smallGroup->load(['leader', 'members.user']);
+        $this->loadSharedLessons();
     }
 
     public function deleteLesson(int $lessonId): void
     {
-        $lesson = SmallGroupLesson::where('id', $lessonId)
-            ->where('small_group_id', $this->smallGroup->id)
-            ->first();
+        Gate::authorize('lessons.delete');
+        abort_unless(auth()->user()->canAccessSmallGroup($this->smallGroup), 403);
+        Lesson::findOrFail($lessonId)->delete();
+        $this->loadSharedLessons();
+        session()->flash('success', 'Lesson deleted successfully.');
+    }
 
-        if ($lesson) {
-            $lesson->delete();
-            $this->smallGroup->refresh();
-            $this->smallGroup->load(['leader', 'members.user', 'lessons.progress']);
-            session()->flash('success', 'Lesson deleted successfully.');
-        }
+    private function loadSharedLessons(): void
+    {
+        $this->smallGroup->setRelation('lessons', Lesson::ordered()->with('progress')->get());
     }
 
     public function render()

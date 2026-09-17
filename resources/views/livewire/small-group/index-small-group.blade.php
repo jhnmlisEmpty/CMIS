@@ -4,10 +4,10 @@
 
     <x-page-header title="Small groups" subtitle="Build communities, organize members, and guide lessons in one place.">
         <x-slot:actions>
-            <a href="{{ route('small-groups.create') }}" class="event-button-primary" wire:navigate>
+            @can('small_groups.create')<a href="{{ route('small-groups.create') }}" class="event-button-primary" wire:navigate>
                 <x-heroicon-o-plus aria-hidden="true" />
                 New small group
-            </a>
+            </a>@endcan
         </x-slot:actions>
     </x-page-header>
 
@@ -66,8 +66,8 @@
                     <div><span @class(['group-status', 'is-active' => $group->status === 'active'])><i></i>{{ ucfirst($group->status) }}</span></div>
                     <div class="event-row-actions">
                         <a href="{{ route('small-groups.show', $group) }}" title="Open group" aria-label="Open {{ $group->name }}" wire:navigate><x-heroicon-o-chevron-right /></a>
-                        <a href="{{ route('small-groups.edit', $group) }}" title="Edit group" aria-label="Edit {{ $group->name }}" wire:navigate><x-heroicon-o-pencil-square /></a>
-                        <button wire:click="deleteSmallGroup({{ $group->id }})" wire:confirm="Delete {{ $group->name }}? This cannot be undone." title="Delete group" aria-label="Delete {{ $group->name }}"><x-heroicon-o-trash /></button>
+                        @can('small_groups.update')<a href="{{ route('small-groups.edit', $group) }}" title="Edit group" aria-label="Edit {{ $group->name }}" wire:navigate><x-heroicon-o-pencil-square /></a>@endcan
+                        @can('small_groups.delete')<button wire:click="deleteSmallGroup({{ $group->id }})" wire:confirm="Delete {{ $group->name }}? This cannot be undone." title="Delete group" aria-label="Delete {{ $group->name }}"><x-heroicon-o-trash /></button>@endcan
                     </div>
                 </article>
             @empty
@@ -75,7 +75,7 @@
                     <span class="event-empty-icon"><x-heroicon-o-user-group aria-hidden="true" /></span>
                     <h3>{{ $search || $statusFilter ? 'No matching groups' : 'Start a small-group community' }}</h3>
                     <p>{{ $search || $statusFilter ? 'Try another search or clear the filters to see every group.' : 'Create the first group, assign its leader, then begin adding members and lessons.' }}</p>
-                    @if($search || $statusFilter)<button wire:click="clearFilters" class="event-button-secondary">Clear filters</button>@else<a href="{{ route('small-groups.create') }}" class="event-button-primary" wire:navigate>Create a group</a>@endif
+                    @if($search || $statusFilter)<button wire:click="clearFilters" class="event-button-secondary">Clear filters</button>@else @can('small_groups.create')<a href="{{ route('small-groups.create') }}" class="event-button-primary" wire:navigate>Create a group</a>@endcan @endif
                 </div>
             @endforelse
         </div>

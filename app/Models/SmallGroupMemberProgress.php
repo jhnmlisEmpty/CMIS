@@ -28,7 +28,7 @@ class SmallGroupMemberProgress extends Model
      */
     protected $fillable = [
         'small_group_member_id',
-        'small_group_lesson_id',
+        'lesson_id',
         'status',
         'completed_at',
         'notes',
@@ -57,7 +57,7 @@ class SmallGroupMemberProgress extends Model
      */
     public function lesson(): BelongsTo
     {
-        return $this->belongsTo(SmallGroupLesson::class, 'small_group_lesson_id');
+        return $this->belongsTo(Lesson::class);
     }
 
     /**

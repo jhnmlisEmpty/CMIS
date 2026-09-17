@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -60,19 +61,6 @@ class SmallGroup extends Model
     /**
      * Get the lessons of the small group.
      */
-    public function lessons(): HasMany
-    {
-        return $this->hasMany(SmallGroupLesson::class)->orderBy('order');
-    }
-
-    /**
-     * Get published lessons of the small group.
-     */
-    public function publishedLessons(): HasMany
-    {
-        return $this->lessons()->where('status', 'published');
-    }
-
     /**
      * Check if small group is active.
      */
@@ -87,5 +75,12 @@ class SmallGroup extends Model
     public function scopeActive($query)
     {
         return $query->where('status', self::STATUS_ACTIVE);
+    }
+
+    public function scopeVisibleTo(Builder $query, ?User $viewer): Builder
+    {
+        return $viewer?->isSmallGroupLeader()
+            ? $query->where('leader_id', $viewer->id)
+            : $query;
     }
 }

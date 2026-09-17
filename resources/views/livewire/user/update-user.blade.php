@@ -42,8 +42,22 @@
                 <div class="event-form member-fields">
                     <div class="event-field"><label for="password">New password</label><p class="event-field-hint">Leave blank to keep the current password.</p><input type="password" id="password" wire:model="password" placeholder="Enter a new password" autocomplete="new-password" class="@error('password') is-invalid @enderror">@error('password')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
                     <div class="event-field"><label for="password_confirmation">Confirm new password</label><p class="event-field-hint">Required only when changing the password.</p><input type="password" id="password_confirmation" wire:model="password_confirmation" placeholder="Confirm new password" autocomplete="new-password"></div>
-                    <div class="event-field"><label for="role">Role <span aria-hidden="true">*</span></label><p class="event-field-hint">Controls access and responsibilities.</p><select id="role" wire:model="role" class="@error('role') is-invalid @enderror">@foreach($roles as $role)<option value="{{ $role }}">{{ ucwords(str_replace('_', ' ', $role)) }}</option>@endforeach</select>@error('role')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
-                    <div class="event-field"><label for="status">Status <span aria-hidden="true">*</span></label><p class="event-field-hint">Only active members can use the system.</p><select id="status" wire:model="status" class="@error('status') is-invalid @enderror">@foreach($statuses as $status)<option value="{{ $status }}">{{ ucfirst($status) }}</option>@endforeach</select>@error('status')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
+                    @if($leaderAssignmentLocked)
+                        <div class="member-leader-lock event-field-wide" role="note" aria-labelledby="leader-lock-title">
+                            <span><x-heroicon-o-lock-closed aria-hidden="true" /></span>
+                            <div>
+                                <strong id="leader-lock-title">Role and status are locked</strong>
+                                <p>This user currently leads {{ count($ledSmallGroups) === 1 ? 'a small group' : count($ledSmallGroups).' small groups' }}. Reassign {{ count($ledSmallGroups) === 1 ? 'that group' : 'those groups' }} before changing this account’s role or status.</p>
+                                <ul>
+                                    @foreach($ledSmallGroups as $group)
+                                        <li>@can('small_groups.update')<a href="{{ route('small-groups.edit', $group['id']) }}" wire:navigate>{{ $group['name'] }} <x-heroicon-o-arrow-up-right /></a>@else<span>{{ $group['name'] }}</span>@endcan</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        </div>
+                    @endif
+                    @can('users.assign_roles')<div @class(['event-field', 'is-locked' => $leaderAssignmentLocked])><label for="role">Role <span aria-hidden="true">*</span></label><p class="event-field-hint">{{ $leaderAssignmentLocked ? 'Reassign the listed groups to unlock this field.' : 'Controls access and responsibilities.' }}</p><select id="role" wire:model="role" @disabled($leaderAssignmentLocked) class="@error('role') is-invalid @enderror">@foreach($roles as $role)<option value="{{ $role }}">{{ ucwords(str_replace('_', ' ', $role)) }}</option>@endforeach</select>@error('role')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>@endcan
+                    <div @class(['event-field', 'is-locked' => $leaderAssignmentLocked])><label for="status">Status <span aria-hidden="true">*</span></label><p class="event-field-hint">{{ $leaderAssignmentLocked ? 'Reassign the listed groups to unlock this field.' : 'Only active members can use the system.' }}</p><select id="status" wire:model="status" @disabled($leaderAssignmentLocked) class="@error('status') is-invalid @enderror">@foreach($statuses as $status)<option value="{{ $status }}">{{ ucfirst($status) }}</option>@endforeach</select>@error('status')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
                 </div>
                 <div class="event-form-actions member-form-actions"><a href="{{ route('users.show', $user) }}" class="event-button-secondary" wire:navigate>Cancel</a><button type="submit" class="event-button-primary" wire:loading.attr="disabled" wire:target="save"><span wire:loading.remove wire:target="save">Save changes</span><span wire:loading wire:target="save">Saving…</span><x-heroicon-o-chevron-right wire:loading.remove wire:target="save" /></button></div>
             </section>

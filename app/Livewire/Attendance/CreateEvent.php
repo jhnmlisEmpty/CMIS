@@ -1,17 +1,27 @@
 <?php
+
 namespace App\Livewire\Attendance;
 
-use Livewire\Component;
+use App\Models\Event;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
-use App\Models\Event;
+use Livewire\Component;
 
 #[Layout('components.layouts.app')]
 #[Title('Create Event | True Vine World Harvest Church - Pangasinan')]
 
 class CreateEvent extends Component
 {
-    public $title, $description, $event_date, $location, $event_type;
+    public $title;
+
+    public $description;
+
+    public $event_date;
+
+    public $location;
+
+    public $event_type;
 
     protected $rules = [
         'title' => 'required|string',
@@ -23,6 +33,7 @@ class CreateEvent extends Component
 
     public function submit()
     {
+        Gate::authorize('events.create');
         $this->validate();
         Event::create([
             'title' => $this->title,
@@ -32,6 +43,7 @@ class CreateEvent extends Component
             'event_type' => $this->event_type,
         ]);
         session()->flash('success', 'Event created successfully!');
+
         return redirect()->route('events.index');
     }
 

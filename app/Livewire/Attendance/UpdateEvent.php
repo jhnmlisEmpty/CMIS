@@ -1,20 +1,27 @@
 <?php
+
 namespace App\Livewire\Attendance;
 
-use Livewire\Component;
+use App\Models\Event;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
-use App\Models\Event;
+use Livewire\Component;
 
 #[Layout('components.layouts.app')]
 #[Title('Edit Event')]
 class UpdateEvent extends Component
 {
     public Event $event;
+
     public string $title = '';
+
     public string $description = '';
+
     public string $event_date = '';
+
     public string $location = '';
+
     public string $event_type = '';
 
     protected $rules = [
@@ -37,6 +44,7 @@ class UpdateEvent extends Component
 
     public function submit(): void
     {
+        Gate::authorize('events.update');
         $this->validate();
         $this->event->update([
             'title' => $this->title,

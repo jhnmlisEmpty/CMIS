@@ -8,11 +8,11 @@
         :backRoute="route('small-groups.show', $smallGroup)"
         backLabel="Group details">
         <x-slot:actions>
-            @if(!$showForm)
+            @can('lessons.create')@if(!$showForm)
                 <button wire:click="showCreateForm" class="event-button-primary">
                     <x-heroicon-o-plus aria-hidden="true" />New lesson
                 </button>
-            @endif
+            @endif@endcan
         </x-slot:actions>
     </x-page-header>
 
@@ -44,11 +44,11 @@
                     <input type="number" id="order" wire:model="order" min="1" class="@error('order') is-invalid @enderror">
                     @error('order')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
                 </div>
-                <div class="event-field">
+                @can('lessons.publish')<div class="event-field">
                     <label for="status">Status <span aria-hidden="true">*</span></label>
                     <p class="event-field-hint">Publish when ready for members.</p>
                     <select id="status" wire:model="status">@foreach($statuses as $s)<option value="{{ $s }}">{{ ucfirst($s) }}</option>@endforeach</select>
-                </div>
+                </div>@else<input type="hidden" wire:model="status">@endcan
                 <div class="event-field event-field-wide">
                     <label for="description">Description</label>
                     <p class="event-field-hint">Add a short overview for leaders and members.</p>
@@ -84,17 +84,17 @@
                     @if($viewingLesson->description)<p class="group-modal-description">{{ $viewingLesson->description }}</p>@endif
                     @if($viewingLesson->content)<x-editorjs-renderer :content="$viewingLesson->content" />@else<div class="event-empty-state event-empty-compact"><h3>No content yet</h3><p>Edit this lesson to add teaching material.</p></div>@endif
                 </div>
-                <footer>
+                @can('lesson_progress.view')<footer>
                     <div class="event-section-heading"><div><span class="event-section-index">P</span><h2>Member progress</h2></div></div>
                     @if($smallGroup->members->count() > 0)
                         <ul class="group-modal-progress">
                             @foreach($smallGroup->members as $member)
                                 @php $progress = $viewingLesson->progress->where('small_group_member_id', $member->id)->first(); $currentStatus = $progress?->status ?? 'not_started'; @endphp
-                                <li><span>{{ $member->user->name }}</span><select wire:change="updateMemberProgress({{ $member->id }}, {{ $viewingLesson->id }}, $event.target.value)">@foreach($progressStatuses as $ps)<option value="{{ $ps }}" {{ $currentStatus === $ps ? 'selected' : '' }}>{{ ucwords(str_replace('_', ' ', $ps)) }}</option>@endforeach</select></li>
+                                <li><span>{{ $member->user->name }}</span>@can('lesson_progress.update')<select wire:change="updateMemberProgress({{ $member->id }}, {{ $viewingLesson->id }}, $event.target.value)">@foreach($progressStatuses as $ps)<option value="{{ $ps }}" {{ $currentStatus === $ps ? 'selected' : '' }}>{{ ucwords(str_replace('_', ' ', $ps)) }}</option>@endforeach</select>@else<strong>{{ ucwords(str_replace('_', ' ', $currentStatus)) }}</strong>@endcan</li>
                             @endforeach
                         </ul>
                     @else<p class="group-modal-empty">No members in this group yet.</p>@endif
-                </footer>
+                </footer>@endcan
             </article>
         </div>
     @endif
@@ -113,14 +113,14 @@
                         <span @class(['group-status', 'is-active' => $lesson->status === 'published'])><i></i>{{ ucfirst($lesson->status) }}</span>
                         <div class="event-row-actions">
                             <button wire:click="viewLesson({{ $lesson->id }})" title="Preview lesson" aria-label="Preview {{ $lesson->title }}"><x-heroicon-o-eye /></button>
-                            <button wire:click="editLesson({{ $lesson->id }})" title="Edit lesson" aria-label="Edit {{ $lesson->title }}"><x-heroicon-o-pencil-square /></button>
-                            <button wire:click="deleteLesson({{ $lesson->id }})" wire:confirm="Delete {{ $lesson->title }}?" title="Delete lesson" aria-label="Delete {{ $lesson->title }}"><x-heroicon-o-trash /></button>
+                            @can('lessons.update')<button wire:click="editLesson({{ $lesson->id }})" title="Edit lesson" aria-label="Edit {{ $lesson->title }}"><x-heroicon-o-pencil-square /></button>@endcan
+                            @can('lessons.delete')<button wire:click="deleteLesson({{ $lesson->id }})" wire:confirm="Delete {{ $lesson->title }}?" title="Delete lesson" aria-label="Delete {{ $lesson->title }}"><x-heroicon-o-trash /></button>@endcan
                         </div>
                     </li>
                 @endforeach
             </ol>
         @else
-            <div class="event-empty-state"><span class="event-empty-icon"><x-heroicon-o-book-open /></span><h3>No lessons yet</h3><p>Create the first lesson to begin building this group’s curriculum.</p>@if(!$showForm)<button wire:click="showCreateForm" class="event-button-primary">Create a lesson</button>@endif</div>
+            <div class="event-empty-state"><span class="event-empty-icon"><x-heroicon-o-book-open /></span><h3>No lessons yet</h3><p>Create the first lesson to begin building this group’s curriculum.</p>@can('lessons.create')@if(!$showForm)<button wire:click="showCreateForm" class="event-button-primary">Create a lesson</button>@endif@endcan</div>
         @endif
     </section>
 </div>
