@@ -16,12 +16,13 @@
     @stack('styles')
 </head>
 @php
-    $hasWorkspaceAccess = auth()->check() && \Illuminate\Support\Facades\Gate::any(['dashboard.view', 'users.view', 'events.view', 'small_groups.view', 'lessons.view']);
+    $hasWorkspaceAccess = auth()->check() && \Illuminate\Support\Facades\Gate::any(['dashboard.view', 'analytics.view', 'users.view', 'events.view', 'small_groups.view', 'lessons.view']);
     $workspaceRoute = Gate::allows('dashboard.view') ? route('home')
         : (Gate::allows('events.view') ? route('events.index')
+        : (Gate::allows('analytics.view') ? route('analytics.index')
         : (Gate::allows('small_groups.view') ? route('small-groups.index')
         : (Gate::allows('lessons.view') ? route('lessons.index')
-        : (Gate::allows('users.view') ? route('users.index') : route('profile')))));
+        : (Gate::allows('users.view') ? route('users.index') : route('profile'))))));
 @endphp
 <body class="app-body min-h-screen font-sans antialiased {{ $hasWorkspaceAccess ? '' : 'member-profile-shell' }}">
     <a href="#main-content" class="skip-link">Skip to content</a>
@@ -35,6 +36,9 @@
             <p class="nav-section-label">Workspace</p>
             @can('dashboard.view')<a href="{{ route('home') }}" class="nav-item {{ request()->routeIs('home') ? 'is-active' : '' }}" wire:navigate>
                 <x-heroicon-o-squares-2x2 /><span>Overview</span>
+            </a>@endcan
+            @can('analytics.view')<a href="{{ route('analytics.index') }}" class="nav-item {{ request()->routeIs('analytics.*') ? 'is-active' : '' }}" wire:navigate>
+                <x-heroicon-o-chart-bar /><span>Analytics</span>
             </a>@endcan
             @can('events.view')<a href="{{ route('events.index') }}" class="nav-item {{ request()->routeIs('events.*') ? 'is-active' : '' }}" wire:navigate>
                 <x-heroicon-o-calendar-days /><span>Events</span>
@@ -74,6 +78,7 @@
     @if($hasWorkspaceAccess)
     <nav class="mobile-nav" aria-label="Mobile navigation">
         @can('dashboard.view')<a href="{{ route('home') }}" class="{{ request()->routeIs('home') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-squares-2x2 /><span>Overview</span></a>@endcan
+        @can('analytics.view')<a href="{{ route('analytics.index') }}" class="{{ request()->routeIs('analytics.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-chart-bar /><span>Analytics</span></a>@endcan
         @can('events.view')<a href="{{ route('events.index') }}" class="{{ request()->routeIs('events.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-calendar-days /><span>Events</span></a>@endcan
         @can('small_groups.view')<a href="{{ route('small-groups.index') }}" class="{{ request()->routeIs('small-groups.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-user-group /><span>Groups</span></a>@endcan
         @can('lessons.view')<a href="{{ route('lessons.index') }}" class="{{ request()->routeIs('lessons.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-book-open /><span>Lessons</span></a>@endcan

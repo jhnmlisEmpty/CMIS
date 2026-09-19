@@ -8,6 +8,7 @@ use App\Models\SmallGroup;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use App\Services\AttendanceAnalyticsService;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -213,7 +214,7 @@ class ViewEvent extends Component
     /**
      * Check in a user by their ID (from search)
      */
-    public function checkInByUserId($userId): void
+    public function checkInByUserId($userId, AttendanceAnalyticsService $analytics): void
     {
         Gate::authorize('attendance.record');
         $this->message = '';
@@ -242,13 +243,7 @@ class ViewEvent extends Component
                 return;
             }
 
-            // Create attendance record
-            Attendance::create([
-                'user_id' => $user->id,
-                'event_id' => $this->event->id,
-                'check_in_time' => now(),
-                'source' => 'manual',
-            ]);
+            $analytics->recordCheckIn($this->event, $user->id, 'manual');
 
             $this->messageType = 'success';
             $this->message = $user->name.' has been checked in successfully.';
@@ -265,7 +260,7 @@ class ViewEvent extends Component
      * Handle QR code scan input
      * Expects a UUID to be scanned
      */
-    public function handleQrScan(): void
+    public function handleQrScan(AttendanceAnalyticsService $analytics): void
     {
         Gate::authorize('attendance.record');
         // Reset message
@@ -306,12 +301,7 @@ class ViewEvent extends Component
             }
 
             // Create attendance record
-            Attendance::create([
-                'user_id' => $user->id,
-                'event_id' => $this->event->id,
-                'check_in_time' => now(),
-                'source' => 'qr_scan',
-            ]);
+            $analytics->recordCheckIn($this->event, $user->id, 'qr_scan');
 
             $this->messageType = 'success';
             $this->message = $user->name.' has been checked in successfully.';
@@ -324,13 +314,26 @@ class ViewEvent extends Component
         }
     }
 
+    public function correctRequiredAttendance(int $expectationId, string $status, AttendanceAnalyticsService $analytics): void
+    {
+        Gate::authorize('attendance.record');
+        $expectation = $this->event->attendanceExpectations()->findOrFail($expectationId);
+        $analytics->correctExpectation($expectation, $status);
+        $this->event->refresh();
+        $this->messageType = 'success';
+        $this->message = 'Required attendance was corrected and the member score was recalculated.';
+    }
+
     public function render()
     {
+        $this->event->load(['audienceRules', 'attendanceExpectations.user', 'attendanceExpectations.groups']);
         return view('livewire.attendance.view-event', [
             'event' => $this->event,
             'attendanceRoles' => User::ROLES,
             'attendanceStatuses' => User::STATUSES,
             'smallGroups' => SmallGroup::query()->visibleTo(auth()->user())->active()->orderBy('name')->get(),
+            'requiredRoster' => $this->event->attendanceExpectations
+                ->filter(fn ($expectation) => auth()->user()->canAccessMember($expectation->user)),
         ]);
     }
 }

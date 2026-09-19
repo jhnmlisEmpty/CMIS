@@ -47,7 +47,8 @@
                 <div class="event-field">
                     <label for="event_date">Date <span aria-hidden="true">*</span></label>
                     <p class="event-field-hint">When the gathering takes place.</p>
-                    <input type="date" id="event_date" wire:model="event_date" class="@error('event_date') is-invalid @enderror">
+                    <input type="date" id="event_date" wire:model="event_date" @disabled($event->isAudienceLocked()) class="@error('event_date') is-invalid @enderror">
+                    @if($event->isAudienceLocked())<p class="event-field-hint">The date is locked because the required roster has been snapshotted.</p>@endif
                     @error('event_date')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
                 </div>
 
@@ -67,6 +68,8 @@
                     </div>
                     @error('location')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
                 </div>
+
+                @include('livewire.attendance.partials.attendance-requirements')
 
                 <div class="event-form-actions">
                     <a href="{{ route('events.view', $event->id) }}" class="event-button-secondary" wire:navigate>Cancel</a>

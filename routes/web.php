@@ -6,6 +6,7 @@ use App\Livewire\Attendance\CreateEvent;
 use App\Livewire\Attendance\IndexEvent;
 use App\Livewire\Attendance\UpdateEvent;
 use App\Livewire\Attendance\ViewEvent;
+use App\Livewire\Analytics\AnalyticsDashboard;
 use App\Livewire\Settings\ManageAccessControl;
 use App\Livewire\Lessons\ManageLessons as GlobalManageLessons;
 use App\Livewire\Lessons\ViewLesson as GlobalViewLesson;
@@ -56,6 +57,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/', function () {
         return view('home');
     })->middleware('can:dashboard.view')->name('home');
+    Route::get('/analytics', AnalyticsDashboard::class)->middleware('can:analytics.view')->name('analytics.index');
 
     Route::get('/profile', ViewUser::class)->name('profile');
     Route::get('/profile/edit', EditProfile::class)->name('profile.edit');
