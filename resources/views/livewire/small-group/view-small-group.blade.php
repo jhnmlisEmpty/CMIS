@@ -35,6 +35,12 @@
         </div>
     </section>
 
+    <section class="group-analytics-strip" aria-label="Cell-group analytics">
+        <div><small>Required attendance</small><strong>{{ $groupAnalytics['attendance_rate'] === null ? 'No data' : $groupAnalytics['attendance_rate'].'%' }}</strong><span>{{ $groupAnalytics['present'] }} present, {{ $groupAnalytics['absent'] }} absent</span></div>
+        <div><small>Lesson completion</small><strong>{{ $groupAnalytics['lesson_rate'] === null ? 'No data' : $groupAnalytics['lesson_rate'].'%' }}</strong><span>{{ $groupAnalytics['completed_lessons'] }}/{{ $groupAnalytics['lesson_total'] }} member lessons</span></div>
+        @can('analytics.view')<a href="{{ route('analytics.index', ['tab' => 'groups']) }}" wire:navigate>Open group analytics <x-heroicon-o-chevron-right /></a>@endcan
+    </section>
+
     <div class="group-overview-grid">
         <section class="event-checkin-panel" aria-labelledby="group-about-title">
             <div class="event-section-heading"><div><span class="event-section-index">01</span><h2 id="group-about-title">About this group</h2></div></div>

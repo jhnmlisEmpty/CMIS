@@ -55,6 +55,30 @@
         </div>
     </section>
 
+    @if($event->attendance_required)
+        @php
+            $requiredTotal = $requiredRoster->count();
+            $requiredPresent = $requiredRoster->where('status', 'present')->count();
+            $requiredAbsent = $requiredRoster->where('status', 'absent')->count();
+            $requiredPending = $requiredRoster->where('status', 'pending')->count();
+            $requiredRate = $requiredTotal && $event->attendance_finalized_at ? round(($requiredPresent / $requiredTotal) * 100) : null;
+        @endphp
+        <section class="analytics-event-summary" aria-labelledby="required-attendance-title">
+            <header><div><span class="event-eyebrow">Required attendance</span><h2 id="required-attendance-title">{{ $event->attendance_finalized_at ? 'Finalized roster' : ($event->audience_snapshotted_at ? 'Attendance in progress' : 'Scheduled roster') }}</h2></div><span class="analytics-state">{{ $event->attendance_finalized_at ? 'Finalized' : ($event->audience_snapshotted_at ? 'Snapshotted' : 'Awaiting event day') }}</span></header>
+            <div class="analytics-summary-metrics">
+                <div><small>Required</small><strong>{{ $requiredTotal }}</strong></div>
+                <div><small>Present</small><strong>{{ $requiredPresent }}</strong></div>
+                <div><small>Absent</small><strong>{{ $requiredAbsent }}</strong></div>
+                <div><small>Pending</small><strong>{{ $requiredPending }}</strong></div>
+                <div><small>Attendance rate</small><strong>{{ $requiredRate === null ? 'Pending' : $requiredRate.'%' }}</strong></div>
+                <div><small>Points</small><strong>+{{ $event->attendance_reward_points }} / -{{ $event->absence_penalty_points }}</strong></div>
+            </div>
+            @if($event->audience_snapshotted_at && $requiredRoster->isEmpty())
+                <div class="event-empty-state event-empty-compact"><h3>No required members</h3><p>The audience rules matched no active members when the roster was snapshotted.</p></div>
+            @endif
+        </section>
+    @endif
+
     @if($event->description)
         <section class="event-description-panel" aria-labelledby="event-description-title">
             <div class="event-section-heading">

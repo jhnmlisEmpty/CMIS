@@ -8,6 +8,10 @@ final class PermissionRegistry
         'Dashboard' => [
             'dashboard.view' => 'View dashboard',
         ],
+        'Analytics' => [
+            'analytics.view' => 'View attendance and growth analytics',
+            'analytics.manage_settings' => 'Manage analytics thresholds',
+        ],
         'Members' => [
             'users.view' => 'View members',
             'users.create' => 'Create members',
@@ -54,6 +58,7 @@ final class PermissionRegistry
 
     public const DEPENDENCIES = [
         'users.create' => ['users.view'],
+        'analytics.manage_settings' => ['analytics.view'],
         'users.update' => ['users.view'],
         'users.delete' => ['users.view'],
         'users.export' => ['users.view'],

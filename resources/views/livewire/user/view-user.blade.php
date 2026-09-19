@@ -39,6 +39,19 @@
         </section>
     </div>
 
+    <section class="member-growth" aria-labelledby="member-growth-title">
+        <header><div><span class="event-eyebrow">Growth journey</span><h2 id="member-growth-title">Attendance and learning</h2></div><p>{{ $growth['required_events'] ? 'Based on finalized required events.' : 'No required attendance has been finalized yet.' }}</p></header>
+        <div class="member-growth-grid">
+            <div class="member-score-card"><div><span>Engagement score</span><strong>{{ $growth['score'] }}<small>/100</small></strong></div><div class="member-score-track" role="progressbar" aria-label="Engagement score" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $growth['score'] }}"><i style="width: {{ $growth['score'] }}%"></i></div><p>{{ $growth['required_events'] ? 'Attendance adds points and absence deducts points.' : 'Your score will begin changing after your first required event.' }}</p></div>
+            <dl class="member-growth-stats"><div><dt>Current streak</dt><dd>{{ $growth['current_streak'] }}</dd><small>required {{ Str::plural('event', $growth['current_streak']) }}</small></div><div><dt>Best streak</dt><dd>{{ $growth['longest_streak'] }}</dd><small>consecutive attended</small></div><div><dt>{{ $growth['rolling_days'] }}-day attendance</dt><dd>{{ $growth['attendance_rate'] === null ? '—' : $growth['attendance_rate'].'%' }}</dd><small>finalized required events</small></div><div><dt>Lesson completion</dt><dd>{{ $growth['lesson_rate'] === null ? '—' : $growth['lesson_rate'].'%' }}</dd><small>{{ $growth['completed_lessons'] }}/{{ $growth['lesson_opportunities'] }} completed</small></div></dl>
+        </div>
+        <div class="member-growth-details">
+            <div><h3>Recent required attendance</h3>@if($attendanceHistory->isNotEmpty())<ul class="member-history">@foreach($attendanceHistory as $item)<li><span class="analytics-status is-{{ $item->status }}">{{ ucfirst($item->status) }}</span><div><strong>{{ $item->event->title }}</strong><small>{{ $item->event->event_date->format('M j, Y') }}</small></div><b>{{ $item->points_delta > 0 ? '+' : '' }}{{ $item->points_delta }}</b></li>@endforeach</ul>@else<p class="event-muted">No finalized required attendance yet.</p>@endif</div>
+            <div><h3>Upcoming required events</h3>@if($upcomingRequiredEvents->isNotEmpty())<ul class="member-upcoming">@foreach($upcomingRequiredEvents as $upcoming)<li><time><strong>{{ $upcoming->event_date->format('d') }}</strong><small>{{ $upcoming->event_date->format('M') }}</small></time><div><strong>{{ $upcoming->title }}</strong><small>{{ $upcoming->location }}</small></div></li>@endforeach</ul>@else<p class="event-muted">No upcoming required events are assigned.</p>@endif</div>
+        </div>
+        <div class="member-trend" aria-label="Six month attendance trend"><h3>Six-month attendance trend</h3>@if($memberTrend->contains('has_data', true))<div>@foreach($memberTrend as $point)<span title="{{ $point['label'] }}: {{ $point['has_data'] ? $point['rate'].'%' : 'No data' }}"><i style="height: {{ $point['has_data'] ? max(4, $point['rate']) : 0 }}%"></i><small>{{ $point['label'] }}</small></span>@endforeach</div>@else<p>No finalized required attendance is available for this period.</p>@endif</div>
+    </section>
+
     <div class="member-detail-grid">
         <section class="event-checkin-panel" aria-labelledby="personal-info-title">
             <div class="event-section-heading"><div><span class="event-section-index">01</span><h2 id="personal-info-title">Personal information</h2></div></div>

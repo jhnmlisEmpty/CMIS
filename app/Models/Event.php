@@ -11,6 +11,9 @@ class Event extends Model
     {
         return [
             'event_date' => 'date',
+            'attendance_required' => 'boolean',
+            'audience_snapshotted_at' => 'datetime',
+            'attendance_finalized_at' => 'datetime',
         ];
     }
 
@@ -20,6 +23,11 @@ class Event extends Model
         'event_date',
         'location',
         'event_type',
+        'attendance_required',
+        'attendance_reward_points',
+        'absence_penalty_points',
+        'audience_snapshotted_at',
+        'attendance_finalized_at',
     ];
 
     /**
@@ -28,5 +36,20 @@ class Event extends Model
     public function attendances(): HasMany
     {
         return $this->hasMany(Attendance::class);
+    }
+
+    public function audienceRules(): HasMany
+    {
+        return $this->hasMany(EventAudienceRule::class);
+    }
+
+    public function attendanceExpectations(): HasMany
+    {
+        return $this->hasMany(EventAttendanceExpectation::class);
+    }
+
+    public function isAudienceLocked(): bool
+    {
+        return $this->audience_snapshotted_at !== null;
     }
 }

@@ -229,6 +229,16 @@ class User extends Authenticatable
         return $this->hasMany(SmallGroupMember::class);
     }
 
+    public function attendanceExpectations(): HasMany
+    {
+        return $this->hasMany(EventAttendanceExpectation::class);
+    }
+
+    public function engagementStat(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(MemberEngagementStat::class);
+    }
+
     /**
      * Get small groups this user is a member of (through memberships).
      */

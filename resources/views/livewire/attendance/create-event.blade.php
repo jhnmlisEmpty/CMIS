@@ -68,6 +68,8 @@
                     @error('location')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
                 </div>
 
+                @include('livewire.attendance.partials.attendance-requirements')
+
                 <div class="event-form-actions">
                     <a href="{{ route('events.index') }}" class="event-button-secondary" wire:navigate>Cancel</a>
                     <button type="submit" class="event-button-primary" wire:loading.attr="disabled" wire:target="submit">
