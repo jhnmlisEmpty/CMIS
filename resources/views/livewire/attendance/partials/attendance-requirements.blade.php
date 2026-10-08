@@ -25,9 +25,8 @@
             <label class="analytics-choice"><input type="checkbox" wire:model.live="audience_all_active"><span>All active members</span></label>
             @unless($audience_all_active)
                 <div class="analytics-audience-columns">
-                    <div><strong>Roles</strong>@foreach($audienceRoles as $role)<label class="analytics-choice"><input type="checkbox" value="{{ $role }}" wire:model="selectedRoles"><span>{{ ucwords(str_replace('_', ' ', $role)) }}</span></label>@endforeach</div>
+                    <div><strong>Roles</strong>@foreach($audienceRoles as $role)<label class="analytics-choice"><input type="checkbox" value="{{ $role->slug }}" wire:model="selectedRoles"><span>{{ $role->name }}</span></label>@endforeach</div>
                     <div><strong>Cell groups</strong>@forelse($audienceGroups as $group)<label class="analytics-choice"><input type="checkbox" value="{{ $group->id }}" wire:model="selectedSmallGroups"><span>{{ $group->name }}</span></label>@empty<small>No active groups</small>@endforelse</div>
-                    <div><strong>Specific members</strong><div class="analytics-member-choices">@forelse($audienceUsers as $member)<label class="analytics-choice"><input type="checkbox" value="{{ $member->id }}" wire:model="selectedUsers"><span>{{ $member->name }}</span></label>@empty<small>No active members</small>@endforelse</div></div>
                 </div>
             @endunless
             @error('audience')<p class="event-field-error">{{ $message }}</p>@enderror

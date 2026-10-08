@@ -3,9 +3,14 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Concerns\Auditable;
+use App\Services\AccessManager;
+use App\Support\PermissionRegistry;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -13,20 +18,20 @@ use Illuminate\Support\Str;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use Auditable, HasFactory, Notifiable;
 
     /**
      * Role constants
      */
-    public const ROLE_ADMIN = 'admin';
+    public const ROLE_ADMIN = Role::ADMIN;
 
-    public const ROLE_PASTOR = 'pastor';
+    public const ROLE_PASTOR = Role::PASTOR;
 
-    public const ROLE_MINISTRY_HEAD = 'ministry_head';
+    public const ROLE_MINISTRY_HEAD = Role::MINISTRY_HEAD;
 
-    public const ROLE_SMALL_GROUP_LEADER = 'small_group_leader';
+    public const ROLE_SMALL_GROUP_LEADER = Role::SMALL_GROUP_LEADER;
 
-    public const ROLE_MEMBER = 'member';
+    public const ROLE_MEMBER = Role::MEMBER;
 
     public const ROLES = [
         self::ROLE_ADMIN,
@@ -35,6 +40,9 @@ class User extends Authenticatable
         self::ROLE_SMALL_GROUP_LEADER,
         self::ROLE_MEMBER,
     ];
+
+    /** Compatibility bridge for legacy seeders and factories that still pass one role slug. */
+    protected ?string $pendingRoleSlug = null;
 
     /**
      * Status constants
@@ -74,6 +82,7 @@ class User extends Authenticatable
         'gender',
         'birthdate',
         'phone',
+        'social_media_url',
         'address',
         'region_code',
         'province_code',
@@ -124,6 +133,49 @@ class User extends Authenticatable
                 $user->uuid = (string) Str::uuid();
             }
         });
+
+        static::saved(function (User $user): void {
+            $slug = $user->pendingRoleSlug;
+
+            if ($slug !== null) {
+                $role = Role::query()->where('slug', $slug)->first()
+                    ?? Role::defaultForNewUsers();
+
+                if ($role) {
+                    $user->roles()->sync([$role->id]);
+                    $user->unsetRelation('roles');
+                }
+
+                $user->pendingRoleSlug = null;
+            } elseif (! $user->roles()->exists()) {
+                $defaultRole = Role::defaultForNewUsers();
+                if ($defaultRole) {
+                    $user->roles()->attach($defaultRole->id);
+                }
+            }
+        });
+    }
+
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class)->withTimestamps();
+    }
+
+    /**
+     * Transitional single-role accessor. New application code must use roles().
+     */
+    public function getRoleAttribute(): ?string
+    {
+        if ($this->relationLoaded('roles')) {
+            return $this->roles->sortBy('id')->first()?->slug;
+        }
+
+        return $this->roles()->orderBy('roles.id')->value('slug');
+    }
+
+    public function setRoleAttribute(?string $role): void
+    {
+        $this->pendingRoleSlug = $role ?: Role::MEMBER;
     }
 
     /**
@@ -131,7 +183,20 @@ class User extends Authenticatable
      */
     public function hasRole(string $role): bool
     {
-        return $this->role === $role;
+        if ($this->relationLoaded('roles')) {
+            return $this->roles->contains('slug', $role);
+        }
+
+        return $this->roles()->where('slug', $role)->exists();
+    }
+
+    public function hasAnyRole(array $roles): bool
+    {
+        if ($this->relationLoaded('roles')) {
+            return $this->roles->whereIn('slug', $roles)->isNotEmpty();
+        }
+
+        return $this->roles()->whereIn('slug', $roles)->exists();
     }
 
     /**
@@ -147,54 +212,40 @@ class User extends Authenticatable
         return $this->hasRole(self::ROLE_SMALL_GROUP_LEADER);
     }
 
-    /** Limit member records to the groups led by a small-group leader. */
-    public function scopeVisibleTo(Builder $query, ?User $viewer): Builder
+    public function permissionScope(string $permission): ?string
     {
-        if (! $viewer?->isSmallGroupLeader()) {
-            return $query;
-        }
-
-        return $query->where(function (Builder $query) use ($viewer): void {
-            $query->whereKey($viewer->id)
-                ->orWhereHas('smallGroupMemberships.smallGroup', fn (Builder $groupQuery) => $groupQuery->where('leader_id', $viewer->id));
-        });
+        return app(AccessManager::class)->permissionScope($this, $permission);
     }
 
-    public function canAccessMember(User $member): bool
+    public function hasAllScope(string $permission): bool
     {
-        if (! $this->isSmallGroupLeader() || $this->is($member)) {
-            return true;
-        }
-
-        return $member->smallGroupMemberships()
-            ->whereHas('smallGroup', fn (Builder $query) => $query->where('leader_id', $this->id))
-            ->exists();
+        return $this->permissionScope($permission) === PermissionRegistry::SCOPE_ALL;
     }
 
-    public function canAccessSmallGroup(SmallGroup $smallGroup): bool
+    /** Limit member records using the scope assigned to the requested action. */
+    public function scopeVisibleTo(Builder $query, ?User $viewer, string $permission = 'users.view'): Builder
     {
-        return ! $this->isSmallGroupLeader() || $smallGroup->leader_id === $this->id;
+        return app(AccessManager::class)->scopeMembers($query, $viewer, $permission);
     }
 
-    /**
-     * Permissions granted to this user's role.
-     */
-    public function rolePermissions(): HasMany
+    public function canAccessMember(User $member, string $permission = 'users.view'): bool
     {
-        return $this->hasMany(RolePermission::class, 'role', 'role');
+        return app(AccessManager::class)->canAccessMember($this, $member, $permission);
+    }
+
+    public function canAccessSmallGroup(SmallGroup $smallGroup, string $permission = 'small_groups.view'): bool
+    {
+        return app(AccessManager::class)->canAccessSmallGroup($this, $smallGroup, $permission);
+    }
+
+    public function leadsSmallGroup(SmallGroup $smallGroup): bool
+    {
+        return $smallGroup->leaders()->whereKey($this->id)->exists();
     }
 
     public function hasPermission(string $permission): bool
     {
-        if (! $this->isActive()) {
-            return false;
-        }
-
-        if ($this->isAdmin()) {
-            return true;
-        }
-
-        return $this->rolePermissions->contains('permission', $permission);
+        return $this->permissionScope($permission) !== null;
     }
 
     /**
@@ -216,9 +267,17 @@ class User extends Authenticatable
     /**
      * Get the small groups this user leads.
      */
-    public function ledSmallGroups(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function ledSmallGroups(): BelongsToMany
     {
-        return $this->hasMany(SmallGroup::class, 'leader_id');
+        return $this->belongsToMany(SmallGroup::class, 'small_group_leaders')
+            ->withTimestamps();
+    }
+
+    public function tags(): MorphToMany
+    {
+        return $this->morphToMany(Tag::class, 'taggable')
+            ->where('tags.type', Tag::TYPE_MEMBER)
+            ->withTimestamps();
     }
 
     /**

@@ -1,6 +1,6 @@
 <div class="event-page group-page">
     <x-slot:headerTitle>Edit Small Group</x-slot:headerTitle>
-    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    <x-slot:headerSubtitle>{{ $churchSettings->name }}</x-slot:headerSubtitle>
 
     <x-page-header
         title="Edit small group"
@@ -15,7 +15,7 @@
             <h2>{{ $smallGroup->name }}</h2>
             <p>These changes appear throughout the member and lesson workspaces. Existing memberships and progress stay connected.</p>
             <dl class="event-editor-summary">
-                <div><dt>Created</dt><dd>{{ $smallGroup->created_at?->format('M j, Y') ?? '—' }}</dd></div>
+                <div><dt>Created</dt><dd>{{ $smallGroup->created_at?->format($churchSettings->date_format) ?? '—' }}</dd></div>
                 <div><dt>Group ID</dt><dd>#{{ str_pad($smallGroup->id, 4, '0', STR_PAD_LEFT) }}</dd></div>
             </dl>
         </aside>
@@ -50,15 +50,30 @@
                     @error('description')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
                 </div>
 
-                <div class="event-field">
-                    <label for="leader_id">Group leader <span aria-hidden="true">*</span></label>
-                    <p class="event-field-hint">Select an active member to lead.</p>
-                    <select id="leader_id" wire:model="leader_id" class="@error('leader_id') is-invalid @enderror">
-                        <option value="">Select a leader</option>
-                        @foreach($users as $user)<option value="{{ $user->id }}">{{ $user->name }}</option>@endforeach
-                    </select>
-                    @error('leader_id')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
-                </div>
+                @include('livewire.partials.tag-picker', ['tagLabel' => 'Group tags', 'tagHelp' => 'Select reusable group tags or create a new one.', 'tagInputId' => 'group-tag-search'])
+
+                <fieldset class="event-field event-field-wide group-leader-picker @error('leader_ids') is-invalid @enderror @error('leader_ids.*') is-invalid @enderror">
+                    <legend>Group leaders <span aria-hidden="true">*</span></legend>
+                    <p class="event-field-hint">Select one or more active users from any role.</p>
+                    <div class="group-leader-toolbar">
+                        <div class="group-leader-search">
+                            <x-heroicon-o-magnifying-glass aria-hidden="true" />
+                            <label class="sr-only" for="leader-search">Search group leaders</label>
+                            <input id="leader-search" type="search" wire:model.live.debounce.250ms="leaderSearch" placeholder="Search by name, email, or role" autocomplete="off">
+                            @if($leaderSearch !== '')<button type="button" wire:click="$set('leaderSearch', '')" aria-label="Clear leader search">Clear</button>@endif
+                        </div>
+                        <div class="group-leader-picker-meta"><span>{{ count($leader_ids) }} {{ Str::plural('leader', count($leader_ids)) }} selected</span>@if($leaderSearch !== '')<span>{{ $users->count() }} matching {{ Str::plural('user', $users->count()) }}</span>@endif</div>
+                    </div>
+                    <div class="group-leader-options">
+                        @forelse($users as $user)
+                            <label><input type="checkbox" value="{{ $user->id }}" wire:model="leader_ids"><span>{{ $user->name }} <small>{{ $user->roles->pluck('name')->join(', ') }}</small></span></label>
+                        @empty
+                            <p class="event-field-hint">{{ $leaderSearch !== '' ? 'No active users match your search.' : 'No active users are available.' }}</p>
+                        @endforelse
+                    </div>
+                    @error('leader_ids')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
+                    @error('leader_ids.*')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
+                </fieldset>
 
                 <div class="event-field">
                     <label for="status">Status <span aria-hidden="true">*</span></label>

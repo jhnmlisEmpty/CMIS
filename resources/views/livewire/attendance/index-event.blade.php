@@ -1,6 +1,6 @@
 <div class="event-page">
     <x-slot:headerTitle>Events</x-slot:headerTitle>
-    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    <x-slot:headerSubtitle>{{ $churchSettings->name }}</x-slot:headerSubtitle>
 
     <x-page-header title="Events" subtitle="Plan gatherings and manage attendance from one place.">
         <x-slot:actions>
@@ -25,11 +25,16 @@
                 <h2 id="event-directory-title">{{ $events->total() }} {{ Str::plural('gathering', $events->total()) }}</h2>
             </div>
 
-            <div class="event-filter-group">
+            <div class="event-filter-group event-tag-filter-group">
                 <label class="event-search" for="event-search">
                     <x-heroicon-o-magnifying-glass aria-hidden="true" />
                     <span class="sr-only">Search events</span>
-                    <input id="event-search" type="search" wire:model.live.debounce.300ms="search" placeholder="Search title or location">
+                    <input id="event-search" type="search" wire:model.live.debounce.300ms="search" placeholder="Search event, location, or tag">
+                </label>
+                <label class="event-type-filter" for="event-tag-filter">
+                    <span class="sr-only">Filter by event tag</span>
+                    <select id="event-tag-filter" wire:model.live="tagFilter"><option value="">All event tags</option>@foreach($tags as $tag)<option value="{{ $tag->id }}">{{ $tag->name }}</option>@endforeach</select>
+                    <x-heroicon-o-chevron-down aria-hidden="true" />
                 </label>
                 <label class="event-type-filter" for="event-type-filter">
                     <span class="sr-only">Filter by event type</span>
@@ -44,7 +49,7 @@
             </div>
         </div>
 
-        @if($search || $typeFilter)
+        @if($search || $typeFilter || $tagFilter)
             <div class="event-active-filter">
                 <p>Showing results matching your filters</p>
                 <button wire:click="clearFilters">Clear filters</button>
@@ -55,11 +60,12 @@
             <button wire:click="sort('title')">Event @if($sortBy === 'title')<span>{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>@endif</button>
             <button wire:click="sort('event_date')">Date @if($sortBy === 'event_date')<span>{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>@endif</button>
             <span>Location</span>
+            <span>Tags</span>
             <button wire:click="sort('event_type')">Type @if($sortBy === 'event_type')<span>{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>@endif</button>
             <span><span class="sr-only">Actions</span></span>
         </div>
 
-        <div class="event-list" wire:loading.class="is-loading" wire:target="search,typeFilter,sort,clearFilters">
+        <div class="event-list" wire:loading.class="is-loading" wire:target="search,typeFilter,tagFilter,sort,clearFilters">
             @forelse($events as $event)
                 @php
                     $eventDate = \Illuminate\Support\Carbon::parse($event->event_date);
@@ -76,13 +82,14 @@
                         </span>
                     @can('attendance.view')</a>@else</div>@endcan
                     <time datetime="{{ $eventDate->format('Y-m-d') }}">
-                        <strong>{{ $eventDate->format('M j, Y') }}</strong>
+                        <strong>{{ $eventDate->format($churchSettings->date_format) }}</strong>
                         <small>{{ $eventDate->isPast() ? 'Past event' : $eventDate->diffForHumans() }}</small>
                     </time>
                     <div class="event-location-cell">
                         <x-heroicon-o-map-pin aria-hidden="true" />
                         <span title="{{ $event->location }}">{{ $event->location }}</span>
                     </div>
+                    <div class="record-tag-cell">@forelse($event->tags as $tag)<span class="group-tag-badge">{{ $tag->name }}</span>@empty<span class="group-tag-badge is-empty">No tags</span>@endforelse</div>
                     <div><span class="event-type-badge">{{ ucfirst($event->event_type) }}</span></div>
                     <div class="event-row-actions">
                         @can('attendance.view')<a href="{{ route('events.view', $event->id) }}" title="Open event" aria-label="Open {{ $event->title }}" wire:navigate>
@@ -101,9 +108,9 @@
                     <span class="event-empty-icon">
                         <x-heroicon-o-calendar-days aria-hidden="true" />
                     </span>
-                    <h3>{{ $search || $typeFilter ? 'No matching events' : 'Your event calendar is ready' }}</h3>
-                    <p>{{ $search || $typeFilter ? 'Try another search or clear the filters to see every event.' : 'Create the first event to start tracking gatherings and attendance.' }}</p>
-                    @if($search || $typeFilter)
+                    <h3>{{ $search || $typeFilter || $tagFilter ? 'No matching events' : 'Your event calendar is ready' }}</h3>
+                    <p>{{ $search || $typeFilter || $tagFilter ? 'Try another search or clear the filters to see every event.' : 'Create the first event to start tracking gatherings and attendance.' }}</p>
+                    @if($search || $typeFilter || $tagFilter)
                         <button wire:click="clearFilters" class="event-button-secondary">Clear filters</button>
                     @else
                         @can('events.create')<a href="{{ route('events.create') }}" class="event-button-primary" wire:navigate>Create an event</a>@endcan

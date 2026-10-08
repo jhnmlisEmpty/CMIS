@@ -1,6 +1,6 @@
 <div class="event-page member-page">
     <x-slot:headerTitle>Add Member</x-slot:headerTitle>
-    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    <x-slot:headerSubtitle>{{ $churchSettings->name }}</x-slot:headerSubtitle>
 
     <x-page-header
         title="Add a member"
@@ -44,6 +44,12 @@
                         <input type="tel" id="phone" wire:model="phone" placeholder="+63 9XX XXX XXXX" autocomplete="tel" class="@error('phone') is-invalid @enderror">
                         @error('phone')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
                     </div>
+                    <div class="event-field event-field-wide">
+                        <label for="socialMediaUrl">Social media link</label><p class="event-field-hint">Add a public Facebook, Instagram, LinkedIn, or other profile URL.</p>
+                        <input type="url" id="socialMediaUrl" wire:model="socialMediaUrl" placeholder="https://facebook.com/username" autocomplete="url" class="@error('socialMediaUrl') is-invalid @enderror">
+                        @error('socialMediaUrl')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
+                    </div>
+                    @include('livewire.partials.tag-picker', ['tagLabel' => 'Member tags', 'tagHelp' => 'Add staff-managed labels that help organize the member directory.', 'tagInputId' => 'member-tag-search'])
                     <div class="event-field">
                         <label for="gender">Gender <span aria-hidden="true">*</span></label><p class="event-field-hint">Select the member’s gender.</p>
                         <select id="gender" wire:model="gender" class="@error('gender') is-invalid @enderror"><option value="">Select gender</option>@foreach($genders as $gender)<option value="{{ $gender }}">{{ ucfirst($gender) }}</option>@endforeach</select>
@@ -80,11 +86,14 @@
                         <label for="password_confirmation">Confirm password <span aria-hidden="true">*</span></label><p class="event-field-hint">Repeat the password exactly.</p>
                         <input type="password" id="password_confirmation" wire:model="password_confirmation" placeholder="Confirm password" autocomplete="new-password">
                     </div>
-                    @can('users.assign_roles')<div class="event-field">
-                        <label for="role">Role <span aria-hidden="true">*</span></label><p class="event-field-hint">Controls access and responsibilities.</p>
-                        <select id="role" wire:model="role" class="@error('role') is-invalid @enderror">@foreach($roles as $role)<option value="{{ $role }}">{{ ucwords(str_replace('_', ' ', $role)) }}</option>@endforeach</select>
-                        @error('role')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
-                    </div>@endcan
+                    @if($canAssignRoles)
+                        <fieldset class="event-field event-field-wide member-role-picker">
+                            <legend>Roles <span aria-hidden="true">*</span></legend><p class="event-field-hint">Permissions from every selected role are combined.</p>
+                            <div class="member-role-options">@foreach($roles as $role)<label><input type="checkbox" value="{{ $role->id }}" wire:model="role_ids"><span><strong>{{ $role->name }}</strong><small>{{ $role->is_system ? 'System role' : 'Custom role' }}</small></span></label>@endforeach</div>
+                            @error('role_ids')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
+                            @error('role_ids.*')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
+                        </fieldset>
+                    @endif
                     <div class="event-field">
                         <label for="status">Status <span aria-hidden="true">*</span></label><p class="event-field-hint">Only active members can use the system.</p>
                         <select id="status" wire:model="status" class="@error('status') is-invalid @enderror">@foreach($statuses as $status)<option value="{{ $status }}">{{ ucfirst($status) }}</option>@endforeach</select>

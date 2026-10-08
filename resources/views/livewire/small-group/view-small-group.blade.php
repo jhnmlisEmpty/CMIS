@@ -1,6 +1,6 @@
 <div class="event-page group-page group-detail-page">
     <x-slot:headerTitle>Small Group Details</x-slot:headerTitle>
-    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    <x-slot:headerSubtitle>{{ $churchSettings->name }}</x-slot:headerSubtitle>
 
     <x-page-header
         :title="$smallGroup->name"
@@ -8,10 +8,10 @@
         :backRoute="route('small-groups.index')"
         backLabel="Small groups">
         <x-slot:actions>
-            @can('small_groups.update')<a href="{{ route('small-groups.edit', $smallGroup) }}" class="event-button-secondary" wire:navigate>
+            @if($canUpdateGroup)<a href="{{ route('small-groups.edit', $smallGroup) }}" class="event-button-secondary" wire:navigate>
                 <x-heroicon-o-pencil-square aria-hidden="true" />
                 Edit group
-            </a>@endcan
+            </a>@endif
         </x-slot:actions>
     </x-page-header>
 
@@ -23,32 +23,33 @@
         @if($smallGroup->photo_path)<img src="{{ route('small-group-photo', ['filename' => basename($smallGroup->photo_path)]) }}" alt="{{ $smallGroup->name }}" class="group-hero-mark group-photo">@else<span class="group-hero-mark" aria-hidden="true">{{ mb_strtoupper(mb_substr($smallGroup->name, 0, 2)) }}</span>@endif
         <div class="event-detail-copy">
             <span @class(['group-status', 'is-active' => $smallGroup->status === 'active'])><i></i>{{ ucfirst($smallGroup->status) }}</span>
-            <p>{{ $smallGroup->leader?->name ?? 'No leader assigned' }}</p>
+            <p>{{ $smallGroup->leaders->pluck('name')->join(', ') ?: 'No leaders assigned' }}</p>
             <div>
                 <x-heroicon-o-user-group aria-hidden="true" />
-                <span>Group leader</span>
+                <span>{{ Str::plural('Group leader', $smallGroup->leaders->count()) }}</span>
             </div>
         </div>
         <div class="group-hero-metrics">
-            <div><strong>{{ $smallGroup->members->count() }}</strong><span>{{ Str::plural('member', $smallGroup->members->count()) }}</span></div>
+            @if($canViewMembers)<div><strong>{{ $smallGroup->members->count() }}</strong><span>{{ Str::plural('member', $smallGroup->members->count()) }}</span></div>@endif
             <div><strong>{{ $smallGroup->lessons->count() }}</strong><span>{{ Str::plural('lesson', $smallGroup->lessons->count()) }}</span></div>
         </div>
     </section>
 
-    <section class="group-analytics-strip" aria-label="Cell-group analytics">
+    @if($canViewAnalytics)<section class="group-analytics-strip" aria-label="Cell-group analytics">
         <div><small>Required attendance</small><strong>{{ $groupAnalytics['attendance_rate'] === null ? 'No data' : $groupAnalytics['attendance_rate'].'%' }}</strong><span>{{ $groupAnalytics['present'] }} present, {{ $groupAnalytics['absent'] }} absent</span></div>
         <div><small>Lesson completion</small><strong>{{ $groupAnalytics['lesson_rate'] === null ? 'No data' : $groupAnalytics['lesson_rate'].'%' }}</strong><span>{{ $groupAnalytics['completed_lessons'] }}/{{ $groupAnalytics['lesson_total'] }} member lessons</span></div>
         @can('analytics.view')<a href="{{ route('analytics.index', ['tab' => 'groups']) }}" wire:navigate>Open group analytics <x-heroicon-o-chevron-right /></a>@endcan
-    </section>
+    </section>@endif
 
     <div class="group-overview-grid">
         <section class="event-checkin-panel" aria-labelledby="group-about-title">
             <div class="event-section-heading"><div><span class="event-section-index">01</span><h2 id="group-about-title">About this group</h2></div></div>
             <div class="group-about-content">
                 <p>{{ $smallGroup->description ?: 'No description has been added for this small group yet.' }}</p>
+                @if($smallGroup->tags->isNotEmpty())<div class="group-detail-tags" aria-label="Group tags">@foreach($smallGroup->tags as $tag)<span class="group-tag-badge">{{ $tag->name }}</span>@endforeach</div>@endif
                 <dl>
-                    <div><dt>Leader</dt><dd>{{ $smallGroup->leader?->name ?? 'Not assigned' }}</dd></div>
-                    <div><dt>Created</dt><dd>{{ $smallGroup->created_at->format('M j, Y') }}</dd></div>
+                    <div><dt>Leaders</dt><dd>{{ $smallGroup->leaders->pluck('name')->join(', ') ?: 'Not assigned' }}</dd></div>
+                <div><dt>Created</dt><dd>{{ $smallGroup->created_at->format($churchSettings->date_format) }}</dd></div>
                     <div><dt>Group ID</dt><dd>#{{ str_pad($smallGroup->id, 4, '0', STR_PAD_LEFT) }}</dd></div>
                 </dl>
             </div>
@@ -57,11 +58,11 @@
         <aside class="group-actions-panel" aria-labelledby="group-actions-title">
             <div class="event-section-heading"><div><span class="event-section-index">02</span><h2 id="group-actions-title">Group workspace</h2></div></div>
             <div class="group-workspace-links">
-                @can('group_members.view')<a href="{{ route('small-groups.members', $smallGroup) }}" wire:navigate>
+                @if($canViewMembers)<a href="{{ route('small-groups.members', $smallGroup) }}" wire:navigate>
                     <span><x-heroicon-o-user-group aria-hidden="true" /></span>
                     <div><strong>Manage members</strong><small>Add, remove, or update status</small></div>
                     <x-heroicon-o-chevron-right aria-hidden="true" />
-                </a>@endcan
+                </a>@endif
                 @can('lessons.view')<a href="{{ route('lessons.index') }}" wire:navigate>
                     <span><x-heroicon-o-book-open aria-hidden="true" /></span>
                     <div><strong>Manage lessons</strong><small>Build and organize the curriculum</small></div>
@@ -72,7 +73,7 @@
     </div>
 
     <div class="group-content-grid">
-        @can('group_members.view')<section class="event-attendance-panel" aria-labelledby="group-members-title">
+        @if($canViewMembers)<section class="event-attendance-panel" aria-labelledby="group-members-title">
             <div class="event-section-heading">
                 <div><span class="event-section-index">03</span><h2 id="group-members-title">Members</h2></div>
                 <a href="{{ route('small-groups.members', $smallGroup) }}" class="group-section-link" wire:navigate>Manage <span aria-hidden="true">→</span></a>
@@ -90,7 +91,7 @@
             @else
                 <div class="event-empty-state event-empty-compact"><span class="event-empty-icon"><x-heroicon-o-user-plus /></span><h3>No members yet</h3><p>Add the first member to begin building this community.</p><a href="{{ route('small-groups.members', $smallGroup) }}" class="event-button-secondary" wire:navigate>Add members</a></div>
             @endif
-        </section>@endcan
+        </section>@endif
 
         @can('lessons.view')<section class="event-attendance-panel" aria-labelledby="group-lessons-title">
             <div class="event-section-heading">
@@ -100,11 +101,11 @@
             @if($smallGroup->lessons->count() > 0)
                 <ol class="group-lesson-list">
                     @foreach($smallGroup->lessons->sortBy('order') as $lesson)
-                        @php $totalMembers = $smallGroup->members->count(); $completedCount = $lesson->progress->where('status', 'completed')->count(); @endphp
+                        @php $totalMembers = $canViewLessonProgress ? $smallGroup->members->count() : 0; $completedCount = $canViewLessonProgress ? $lesson->progress->where('status', 'completed')->count() : 0; @endphp
                         <li>
                             <span class="group-lesson-number">{{ str_pad($lesson->order, 2, '0', STR_PAD_LEFT) }}</span>
                             <div><a href="{{ route('lessons.show', $lesson) }}?group={{ $smallGroup->id }}" wire:navigate>{{ $lesson->title }}</a><small>{{ $lesson->description ?: 'No description' }}</small></div>
-                            <span class="group-lesson-progress">{{ $completedCount }}/{{ $totalMembers }} complete</span>
+                            @if($canViewLessonProgress)<span class="group-lesson-progress">{{ $completedCount }}/{{ $totalMembers }} complete</span>@endif
                             <div class="event-row-actions">
                                 <a href="{{ route('lessons.show', $lesson) }}?group={{ $smallGroup->id }}" title="Open lesson" wire:navigate><x-heroicon-o-chevron-right /></a>
                                 @can('lessons.update')<a href="{{ route('lessons.index') }}?edit={{ $lesson->id }}" title="Edit lesson" wire:navigate><x-heroicon-o-pencil-square /></a>@endcan

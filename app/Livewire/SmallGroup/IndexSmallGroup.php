@@ -3,6 +3,7 @@
 namespace App\Livewire\SmallGroup;
 
 use App\Models\SmallGroup;
+use App\Models\Tag;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -19,6 +20,8 @@ class IndexSmallGroup extends Component
 
     public string $statusFilter = '';
 
+    public string $tagFilter = '';
+
     public string $sortBy = 'name';
 
     public string $sortDirection = 'asc';
@@ -28,6 +31,7 @@ class IndexSmallGroup extends Component
     protected $queryString = [
         'search' => ['except' => ''],
         'statusFilter' => ['except' => ''],
+        'tagFilter' => ['except' => ''],
         'sortBy' => ['except' => 'name'],
         'sortDirection' => ['except' => 'asc'],
     ];
@@ -38,6 +42,11 @@ class IndexSmallGroup extends Component
     }
 
     public function updatingStatusFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingTagFilter(): void
     {
         $this->resetPage();
     }
@@ -54,7 +63,7 @@ class IndexSmallGroup extends Component
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'statusFilter']);
+        $this->reset(['search', 'statusFilter', 'tagFilter']);
         $this->resetPage();
     }
 
@@ -64,7 +73,7 @@ class IndexSmallGroup extends Component
         $smallGroup = SmallGroup::find($id);
 
         if ($smallGroup) {
-            abort_unless(auth()->user()->canAccessSmallGroup($smallGroup), 403);
+            abort_unless(auth()->user()->canAccessSmallGroup($smallGroup, 'small_groups.delete'), 403);
             $smallGroup->delete();
             session()->flash('success', 'Small Group deleted successfully.');
         }
@@ -73,21 +82,24 @@ class IndexSmallGroup extends Component
     public function render()
     {
         $smallGroups = SmallGroup::query()
-            ->visibleTo(auth()->user())
-            ->with(['leader', 'members'])
+            ->visibleTo(auth()->user(), 'small_groups.view')
+            ->with(['leaders', 'members', 'tags'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('name', 'like', "%{$this->search}%")
                         ->orWhere('description', 'like', "%{$this->search}%")
-                        ->orWhereHas('leader', fn ($q) => $q->where('name', 'like', "%{$this->search}%"));
+                        ->orWhereHas('leaders', fn ($q) => $q->where('name', 'like', "%{$this->search}%"))
+                        ->orWhereHas('tags', fn ($q) => $q->where('name', 'like', "%{$this->search}%"));
                 });
             })
             ->when($this->statusFilter, fn ($query) => $query->where('status', $this->statusFilter))
+            ->when($this->tagFilter, fn ($query) => $query->whereHas('tags', fn ($tagQuery) => $tagQuery->whereKey($this->tagFilter)))
             ->orderBy($this->sortBy, $this->sortDirection)
             ->paginate($this->perPage);
 
         return view('livewire.small-group.index-small-group', [
             'smallGroups' => $smallGroups,
+            'tags' => Tag::forType(Tag::TYPE_SMALL_GROUP)->orderBy('name')->get(),
             'statuses' => SmallGroup::STATUSES,
         ]);
     }

@@ -230,7 +230,7 @@ class AttendanceAnalyticsService
                 if ($rule->audience_type === EventAudienceRule::TYPE_ALL_ACTIVE) {
                     $query->orWhereNotNull('id');
                 } elseif ($rule->audience_type === EventAudienceRule::TYPE_ROLE) {
-                    $query->orWhere('role', $rule->audience_key);
+                    $query->orWhereHas('roles', fn ($roleQuery) => $roleQuery->where('slug', $rule->audience_key));
                 } elseif ($rule->audience_type === EventAudienceRule::TYPE_USER) {
                     $query->orWhere('id', (int) $rule->audience_key);
                 } elseif ($rule->audience_type === EventAudienceRule::TYPE_SMALL_GROUP) {

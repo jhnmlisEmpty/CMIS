@@ -1,6 +1,6 @@
 <div class="event-page member-page member-detail-page" x-data="{ qrOpen: false }" @keydown.escape.window="qrOpen = false">
     <x-slot:headerTitle>{{ auth()->id() === $user->id ? 'My Profile' : 'Member Details' }}</x-slot:headerTitle>
-    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    <x-slot:headerSubtitle>{{ $churchSettings->name }}</x-slot:headerSubtitle>
     
     <x-page-header
         :title="$user->name"
@@ -8,7 +8,7 @@
         :backRoute="auth()->id() === $user->id ? route('profile') : route('users.index')"
         :backLabel="auth()->id() === $user->id ? 'My profile' : 'Members'">
         <x-slot:actions>
-            @if(auth()->id() === $user->id)<a href="{{ route('profile.edit') }}" class="event-button-secondary" wire:navigate><x-heroicon-o-pencil-square />Edit my profile</a>@else @can('users.update')<a href="{{ route('users.edit', $user) }}" class="event-button-secondary" wire:navigate><x-heroicon-o-pencil-square />Edit member</a>@endcan @endif
+            @if(auth()->id() === $user->id)<a href="{{ route('profile.edit') }}" class="event-button-secondary" wire:navigate><x-heroicon-o-pencil-square />Edit my profile</a>@elseif(auth()->user()->canAccessMember($user, 'users.update'))<a href="{{ route('users.edit', $user) }}" class="event-button-secondary" wire:navigate><x-heroicon-o-pencil-square />Edit member</a>@endif
             @if(auth()->id() === $user->id)
                 <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="event-button-secondary profile-logout-button"><x-heroicon-o-arrow-left-start-on-rectangle />Log out</button></form>
             @endif
@@ -18,7 +18,7 @@
     <section class="event-detail-hero member-detail-hero" aria-label="Member overview">
         @if($user->profile_photo_path)<img src="{{ route('profile-photo', ['filename' => basename($user->profile_photo_path)]) }}" alt="{{ $user->name }}" class="member-hero-avatar member-photo">@else<span class="member-hero-avatar" aria-hidden="true">{{ collect(explode(' ', $user->name))->map(fn($part) => mb_substr($part, 0, 1))->take(2)->join('') }}</span>@endif
         <div class="event-detail-copy">
-            <div class="member-hero-badges"><span @class(['group-status', 'is-active' => $user->status === 'active'])><i></i>{{ ucfirst($user->status) }}</span><span class="member-role-badge">{{ ucwords(str_replace('_', ' ', $user->role)) }}</span></div>
+            <div class="member-hero-badges"><span @class(['group-status', 'is-active' => $user->status === 'active'])><i></i>{{ ucfirst($user->status) }}</span>@foreach($user->roles as $role)<span class="member-role-badge">{{ $role->name }}</span>@endforeach</div>
             <p>{{ $user->email }}</p>
             <div><x-heroicon-o-phone /><span>{{ $user->phone ?: 'No phone number provided' }}</span></div>
         </div>
@@ -39,18 +39,18 @@
         </section>
     </div>
 
-    <section class="member-growth" aria-labelledby="member-growth-title">
+    @if($canViewGrowth)<section class="member-growth" aria-labelledby="member-growth-title">
         <header><div><span class="event-eyebrow">Growth journey</span><h2 id="member-growth-title">Attendance and learning</h2></div><p>{{ $growth['required_events'] ? 'Based on finalized required events.' : 'No required attendance has been finalized yet.' }}</p></header>
         <div class="member-growth-grid">
             <div class="member-score-card"><div><span>Engagement score</span><strong>{{ $growth['score'] }}<small>/100</small></strong></div><div class="member-score-track" role="progressbar" aria-label="Engagement score" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $growth['score'] }}"><i style="width: {{ $growth['score'] }}%"></i></div><p>{{ $growth['required_events'] ? 'Attendance adds points and absence deducts points.' : 'Your score will begin changing after your first required event.' }}</p></div>
             <dl class="member-growth-stats"><div><dt>Current streak</dt><dd>{{ $growth['current_streak'] }}</dd><small>required {{ Str::plural('event', $growth['current_streak']) }}</small></div><div><dt>Best streak</dt><dd>{{ $growth['longest_streak'] }}</dd><small>consecutive attended</small></div><div><dt>{{ $growth['rolling_days'] }}-day attendance</dt><dd>{{ $growth['attendance_rate'] === null ? '—' : $growth['attendance_rate'].'%' }}</dd><small>finalized required events</small></div><div><dt>Lesson completion</dt><dd>{{ $growth['lesson_rate'] === null ? '—' : $growth['lesson_rate'].'%' }}</dd><small>{{ $growth['completed_lessons'] }}/{{ $growth['lesson_opportunities'] }} completed</small></div></dl>
         </div>
         <div class="member-growth-details">
-            <div><h3>Recent required attendance</h3>@if($attendanceHistory->isNotEmpty())<ul class="member-history">@foreach($attendanceHistory as $item)<li><span class="analytics-status is-{{ $item->status }}">{{ ucfirst($item->status) }}</span><div><strong>{{ $item->event->title }}</strong><small>{{ $item->event->event_date->format('M j, Y') }}</small></div><b>{{ $item->points_delta > 0 ? '+' : '' }}{{ $item->points_delta }}</b></li>@endforeach</ul>@else<p class="event-muted">No finalized required attendance yet.</p>@endif</div>
+        <div><h3>Recent required attendance</h3>@if($attendanceHistory->isNotEmpty())<ul class="member-history">@foreach($attendanceHistory as $item)<li><span class="analytics-status is-{{ $item->status }}">{{ ucfirst($item->status) }}</span><div><strong>{{ $item->event->title }}</strong><small>{{ $item->event->event_date->format($churchSettings->date_format) }}</small></div><b>{{ $item->points_delta > 0 ? '+' : '' }}{{ $item->points_delta }}</b></li>@endforeach</ul>@else<p class="event-muted">No finalized required attendance yet.</p>@endif</div>
             <div><h3>Upcoming required events</h3>@if($upcomingRequiredEvents->isNotEmpty())<ul class="member-upcoming">@foreach($upcomingRequiredEvents as $upcoming)<li><time><strong>{{ $upcoming->event_date->format('d') }}</strong><small>{{ $upcoming->event_date->format('M') }}</small></time><div><strong>{{ $upcoming->title }}</strong><small>{{ $upcoming->location }}</small></div></li>@endforeach</ul>@else<p class="event-muted">No upcoming required events are assigned.</p>@endif</div>
         </div>
         <div class="member-trend" aria-label="Six month attendance trend"><h3>Six-month attendance trend</h3>@if($memberTrend->contains('has_data', true))<div>@foreach($memberTrend as $point)<span title="{{ $point['label'] }}: {{ $point['has_data'] ? $point['rate'].'%' : 'No data' }}"><i style="height: {{ $point['has_data'] ? max(4, $point['rate']) : 0 }}%"></i><small>{{ $point['label'] }}</small></span>@endforeach</div>@else<p>No finalized required attendance is available for this period.</p>@endif</div>
-    </section>
+    </section>@endif
 
     <div class="member-detail-grid">
         <section class="event-checkin-panel" aria-labelledby="personal-info-title">
@@ -58,17 +58,19 @@
             <dl class="member-details-list">
                 <div><dt>Full name</dt><dd>{{ $user->name }}</dd></div>
                 <div><dt>Gender</dt><dd>{{ $user->gender ? ucfirst($user->gender) : 'Not provided' }}</dd></div>
-                <div><dt>Birthdate</dt><dd>@if($user->birthdate){{ $user->birthdate->format('F j, Y') }} <small>{{ $user->age }} years old</small>@else Not provided @endif</dd></div>
+                <div><dt>Birthdate</dt><dd>@if($user->birthdate){{ $user->birthdate->format($churchSettings->date_format) }} <small>{{ $user->age }} years old</small>@else Not provided @endif</dd></div>
                 <div><dt>Email</dt><dd>{{ $user->email }}</dd></div>
                 <div><dt>Phone</dt><dd>{{ $user->phone ?: 'Not provided' }}</dd></div>
-                <div><dt>Member since</dt><dd>{{ $user->created_at?->format('F j, Y') ?? 'Not available' }}</dd></div>
+                <div><dt>Social media</dt><dd>@if($user->social_media_url)<a href="{{ $user->social_media_url }}" target="_blank" rel="noopener noreferrer">{{ Str::limit($user->social_media_url, 48) }}</a>@else Not provided @endif</dd></div>
+                <div><dt>Tags</dt><dd>@if($user->tags->isNotEmpty())<span class="group-detail-tags">@foreach($user->tags as $tag)<span class="group-tag-badge">{{ $tag->name }}</span>@endforeach</span>@else Not provided @endif</dd></div>
+                <div><dt>Member since</dt><dd>{{ $user->created_at?->format($churchSettings->date_format) ?? 'Not available' }}</dd></div>
             </dl>
         </section>
 
         <aside class="member-account-panel" aria-labelledby="account-info-title">
             <div class="event-section-heading"><div><span class="event-section-index">02</span><h2 id="account-info-title">Account</h2></div></div>
             <dl>
-                <div><dt>Role</dt><dd>{{ ucwords(str_replace('_', ' ', $user->role)) }}</dd></div>
+                <div><dt>Roles</dt><dd>{{ $user->roles->pluck('name')->join(', ') }}</dd></div>
                 <div><dt>Status</dt><dd><span @class(['group-status', 'is-active' => $user->status === 'active'])><i></i>{{ ucfirst($user->status) }}</span></dd></div>
                 <div><dt>Record ID</dt><dd>#{{ str_pad($user->id, 4, '0', STR_PAD_LEFT) }}</dd></div>
             </dl>
@@ -88,7 +90,7 @@
                 </div>
             </div>
         @else
-            <div class="event-empty-state event-empty-compact"><span class="event-empty-icon"><x-heroicon-o-map-pin /></span><h3>No location recorded</h3><p>Edit this member to add an address and map position.</p>@if(auth()->id() === $user->id)<a href="{{ route('profile.edit') }}" class="event-button-secondary" wire:navigate>Add location</a>@else @can('users.update')<a href="{{ route('users.edit', $user) }}" class="event-button-secondary" wire:navigate>Add location</a>@endcan @endif</div>
+            <div class="event-empty-state event-empty-compact"><span class="event-empty-icon"><x-heroicon-o-map-pin /></span><h3>No location recorded</h3><p>Edit this member to add an address and map position.</p>@if(auth()->id() === $user->id)<a href="{{ route('profile.edit') }}" class="event-button-secondary" wire:navigate>Add location</a>@elseif(auth()->user()->canAccessMember($user, 'users.update'))<a href="{{ route('users.edit', $user) }}" class="event-button-secondary" wire:navigate>Add location</a>@endif</div>
         @endif
     </section>
 </div>

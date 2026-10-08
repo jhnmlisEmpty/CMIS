@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\AuditLogger;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -11,12 +12,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MemberListExportController extends Controller
 {
-    public function __invoke(Request $request): StreamedResponse
+    public function __invoke(Request $request, AuditLogger $audit): StreamedResponse
     {
         $search = trim((string) $request->query('search', ''));
         $roleFilter = trim((string) $request->query('roleFilter', ''));
         $statusFilter = trim((string) $request->query('statusFilter', ''));
         $smallGroupFilter = trim((string) $request->query('smallGroupFilter', ''));
+        $tagFilter = trim((string) $request->query('tagFilter', ''));
         $locationFilter = trim((string) $request->query('locationFilter', ''));
         $birthdateFrom = trim((string) $request->query('birthdateFrom', ''));
         $birthdateTo = trim((string) $request->query('birthdateTo', ''));
@@ -26,16 +28,19 @@ class MemberListExportController extends Controller
         $sortDirection = strtolower((string) $request->query('sortDirection', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $users = User::query()
-            ->visibleTo($request->user())
+            ->with('tags')
+            ->visibleTo($request->user(), 'users.export')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('phone', 'like', "%{$search}%")
-                        ->orWhere('address', 'like', "%{$search}%");
+                        ->orWhere('social_media_url', 'like', "%{$search}%")
+                        ->orWhere('address', 'like', "%{$search}%")
+                        ->orWhereHas('tags', fn ($tagQuery) => $tagQuery->where('name', 'like', "%{$search}%"));
                 });
             })
-            ->when($roleFilter !== '', fn ($query) => $query->where('role', $roleFilter))
+            ->when($roleFilter !== '', fn ($query) => $query->whereHas('roles', fn ($roleQuery) => $roleQuery->where('slug', $roleFilter)))
             ->when($statusFilter !== '', fn ($query) => $query->where('status', $statusFilter))
             ->when($smallGroupFilter !== '', function ($query) use ($smallGroupFilter) {
                 $query->whereHas('smallGroups', function ($groupQuery) use ($smallGroupFilter) {
@@ -43,6 +48,7 @@ class MemberListExportController extends Controller
                         ->where('small_group_members.status', 'active');
                 });
             })
+            ->when($tagFilter !== '', fn ($query) => $query->whereHas('tags', fn ($tagQuery) => $tagQuery->whereKey($tagFilter)))
             ->when($locationFilter !== '', function ($query) use ($locationFilter) {
                 $query->where(function ($q) use ($locationFilter) {
                     $q->where('address', 'like', "%{$locationFilter}%")
@@ -58,19 +64,21 @@ class MemberListExportController extends Controller
                 $query->whereNotNull('birthdate');
 
                 if ($minAge !== '') {
-                    $query->whereRaw($this->ageSqlExpression() . ' >= ?', [(int) $minAge]);
+                    $query->whereRaw($this->ageSqlExpression().' >= ?', [(int) $minAge]);
                 }
 
                 if ($maxAge !== '') {
-                    $query->whereRaw($this->ageSqlExpression() . ' <= ?', [(int) $maxAge]);
+                    $query->whereRaw($this->ageSqlExpression().' <= ?', [(int) $maxAge]);
                 }
             })
             ->orderBy($sortBy, $sortDirection);
 
+        $audit->log('exported', 'members', 'Member list exported', null, [], $request->query());
+
         return response()->streamDownload(function () use ($users) {
             $handle = fopen('php://output', 'wb');
 
-            fputcsv($handle, ['Name', 'Email', 'Phone', 'Birthdate', 'Age', 'Address']);
+            fputcsv($handle, ['Name', 'Email', 'Phone', 'Social Media Link', 'Tags', 'Birthdate', 'Age', 'Address']);
 
             foreach ($users->cursor() as $user) {
                 $birthdate = $this->formatBirthdateForExport($user);
@@ -80,6 +88,8 @@ class MemberListExportController extends Controller
                     $user->name,
                     $user->email,
                     $user->phone ?? '',
+                    $user->social_media_url ?? '',
+                    $user->tags->pluck('name')->join('; '),
                     $birthdate,
                     $age,
                     $user->address ?? '',
@@ -87,7 +97,7 @@ class MemberListExportController extends Controller
             }
 
             fclose($handle);
-        }, 'member-list-' . now()->format('YmdHis') . '.csv');
+        }, 'member-list-'.now()->format('YmdHis').'.csv');
     }
 
     protected function formatBirthdateForExport(User $user): string
@@ -126,9 +136,9 @@ class MemberListExportController extends Controller
         }
 
         if ($driver === 'pgsql') {
-            return "(EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)))";
+            return '(EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)))';
         }
 
-        return "(TIMESTAMPDIFF(YEAR, birthdate, CURDATE()))";
+        return '(TIMESTAMPDIFF(YEAR, birthdate, CURDATE()))';
     }
 }

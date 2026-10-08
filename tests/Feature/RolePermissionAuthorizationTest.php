@@ -7,6 +7,7 @@ use App\Livewire\Settings\ManageAccessControl;
 use App\Livewire\User\CreateUser;
 use App\Livewire\User\UpdateUser;
 use App\Models\Event;
+use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -38,10 +39,12 @@ class RolePermissionAuthorizationTest extends TestCase
             ->set('selectedRole', User::ROLE_PASTOR)
             ->call('togglePermission', 'events.create')
             ->call('save')
+            ->call('confirmPermissionSave')
             ->assertHasNoErrors();
 
-        $this->assertDatabaseHas('role_permissions', ['role' => User::ROLE_PASTOR, 'permission' => 'events.create']);
-        $this->assertDatabaseHas('role_permissions', ['role' => User::ROLE_PASTOR, 'permission' => 'events.view']);
+        $pastorRoleId = Role::where('slug', Role::PASTOR)->value('id');
+        $this->assertDatabaseHas('role_permissions', ['role_id' => $pastorRoleId, 'permission' => 'events.create']);
+        $this->assertDatabaseHas('role_permissions', ['role_id' => $pastorRoleId, 'permission' => 'events.view']);
         $this->actingAs($pastor)->get(route('events.create'))->assertOk();
     }
 

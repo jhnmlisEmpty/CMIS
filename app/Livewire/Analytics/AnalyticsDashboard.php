@@ -31,8 +31,11 @@ class AnalyticsDashboard extends Component
     public string $search = '';
 
     public int $lowScoreThreshold = 60;
+
     public int $lowAttendanceThreshold = 60;
+
     public int $rollingDays = 90;
+
     public int $minimumRequiredEvents = 3;
 
     public function mount(): void
@@ -69,7 +72,7 @@ class AnalyticsDashboard extends Component
         $viewer = auth()->user();
         $monthStart = Carbon::createFromFormat('Y-m', $this->month)->startOfMonth();
         $monthEnd = $monthStart->copy()->endOfMonth();
-        $visibleUsers = User::query()->visibleTo($viewer);
+        $visibleUsers = User::query()->visibleTo($viewer, 'analytics.view');
         $visibleUserIds = (clone $visibleUsers)->pluck('id');
 
         $monthAttendances = Attendance::query()
@@ -103,6 +106,11 @@ class AnalyticsDashboard extends Component
 
         $eventRows = Event::query()
             ->whereBetween('event_date', [$monthStart, $monthEnd])
+            ->when(! $viewer->hasAllScope('analytics.view'), fn ($query) => $query->where(function ($query) use ($visibleUserIds): void {
+                $query->whereHas('attendances', fn ($attendances) => $attendances->whereIn('user_id', $visibleUserIds))
+                    ->orWhereHas('attendanceExpectations', fn ($expectations) => $expectations->whereIn('user_id', $visibleUserIds));
+            }))
+            ->with('tags')
             ->withCount([
                 'attendances as checkins_count' => fn ($query) => $query->whereIn('user_id', $visibleUserIds),
                 'attendanceExpectations as required_count' => fn ($query) => $query->whereIn('user_id', $visibleUserIds),
@@ -111,7 +119,7 @@ class AnalyticsDashboard extends Component
             ])->orderByDesc('event_date')->get();
 
         $publishedLessons = Lesson::published()->count();
-        $groupRows = SmallGroup::query()->visibleTo($viewer)->active()->withCount(['activeMembers'])->orderBy('name')->get()->map(function (SmallGroup $group) use ($publishedLessons): array {
+        $groupRows = SmallGroup::query()->visibleTo($viewer, 'analytics.view')->active()->with(['leaders', 'tags'])->withCount(['activeMembers'])->orderBy('name')->get()->map(function (SmallGroup $group) use ($publishedLessons): array {
             $memberIds = $group->activeMembers()->pluck('id');
             $attendance = EventAttendanceExpectation::query()->whereHas('groups', fn ($query) => $query->whereKey($group->id))->whereNotNull('finalized_at')->get();
             $groupPresent = $attendance->where('status', 'present')->count();
@@ -129,7 +137,7 @@ class AnalyticsDashboard extends Component
 
         $settings = AnalyticsSetting::current();
         $cutoff = now()->subDays($settings->rolling_days)->startOfDay();
-        $watchlist = User::query()->visibleTo($viewer)->where('status', User::STATUS_ACTIVE)
+        $watchlist = User::query()->visibleTo($viewer, 'analytics.view')->where('status', User::STATUS_ACTIVE)
             ->with(['engagementStat', 'smallGroups' => fn ($query) => $query->where('small_group_members.status', 'active')])
             ->when($this->search, fn ($query) => $query->where('name', 'like', '%'.$this->search.'%'))
             ->orderBy('name')->get()->map(function (User $user) use ($settings, $cutoff): ?array {

@@ -4,14 +4,18 @@ namespace App\Livewire\Attendance;
 
 use App\Models\Attendance;
 use App\Models\Event;
+use App\Models\Role;
 use App\Models\SmallGroup;
 use App\Models\User;
+use App\Services\AttendanceAnalyticsService;
+use App\Services\AuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use App\Services\AttendanceAnalyticsService;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 #[Layout('components.layouts.app')]
 #[Title('Event Details')]
@@ -137,28 +141,58 @@ class ViewEvent extends Component
         ]);
     }
 
+    public function downloadCheckIns(AuditLogger $audit): StreamedResponse
+    {
+        Gate::authorize('attendance.view');
+        $attendances = $this->getAttendances();
+        $filename = Str::slug($this->event->title).'-'.$this->event->event_date->format('Y-m-d').'-check-ins.csv';
+        $audit->log('exported', 'attendance', 'Check-in list exported for '.$this->event->title, $this->event);
+
+        return response()->streamDownload(function () use ($attendances): void {
+            $handle = fopen('php://output', 'wb');
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, ['Member name', 'Email', 'Role', 'Small groups', 'Phone', 'Check-in date', 'Check-in time', 'Source']);
+
+            foreach ($attendances as $attendance) {
+                fputcsv($handle, [
+                    $attendance->user->name,
+                    $attendance->user->email,
+                    $attendance->user->roles->pluck('name')->join('; '),
+                    $attendance->user->smallGroups->pluck('name')->join('; '),
+                    $attendance->user->phone ?? '',
+                    $attendance->check_in_time->format('Y-m-d'),
+                    $attendance->check_in_time->format('g:i A'),
+                    ucwords(str_replace('_', ' ', $attendance->source)),
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
     public function getAttendances()
     {
         Gate::authorize('attendance.view');
         $query = $this->event->attendances()
             ->with([
-                'user',
+                'user.roles',
+                'user.tags',
                 'user.smallGroups' => function ($query) {
                     $query->where('small_group_members.status', 'active')
                         ->where('small_groups.status', 'active');
                 },
             ])
             ->whereHas('user', function ($userQuery) {
-                $userQuery->visibleTo(auth()->user())
+                $userQuery->visibleTo(auth()->user(), 'attendance.view')
                     ->when($this->attendanceSearch !== '', function ($q) {
-                    $q->where(function ($inner) {
-                        $inner->where('name', 'like', '%'.$this->attendanceSearch.'%')
-                            ->orWhere('email', 'like', '%'.$this->attendanceSearch.'%')
-                            ->orWhere('phone', 'like', '%'.$this->attendanceSearch.'%')
-                            ->orWhere('address', 'like', '%'.$this->attendanceSearch.'%');
-                    });
-                })
-                    ->when($this->attendanceRoleFilter !== '', fn ($q) => $q->where('role', $this->attendanceRoleFilter))
+                        $q->where(function ($inner) {
+                            $inner->where('name', 'like', '%'.$this->attendanceSearch.'%')
+                                ->orWhere('email', 'like', '%'.$this->attendanceSearch.'%')
+                                ->orWhere('phone', 'like', '%'.$this->attendanceSearch.'%')
+                                ->orWhere('address', 'like', '%'.$this->attendanceSearch.'%');
+                        });
+                    })
+                    ->when($this->attendanceRoleFilter !== '', fn ($q) => $q->whereHas('roles', fn ($roleQuery) => $roleQuery->where('slug', $this->attendanceRoleFilter)))
                     ->when($this->attendanceSmallGroupFilter !== '', function ($q) {
                         $q->whereHas('smallGroups', function ($groupQuery) {
                             $groupQuery->where('small_groups.id', $this->attendanceSmallGroupFilter)
@@ -204,7 +238,7 @@ class ViewEvent extends Component
         }
 
         return User::query()
-            ->visibleTo(auth()->user())
+            ->visibleTo(auth()->user(), 'attendance.record')
             ->where('name', 'like', '%'.$this->searchName.'%')
             ->where('status', 'active')
             ->limit(10)
@@ -221,7 +255,7 @@ class ViewEvent extends Component
         $this->messageType = '';
 
         try {
-            $user = User::query()->visibleTo(auth()->user())->find($userId);
+            $user = User::query()->visibleTo(auth()->user(), 'attendance.record')->find($userId);
 
             if (! $user) {
                 $this->messageType = 'error';
@@ -277,7 +311,7 @@ class ViewEvent extends Component
 
         try {
             // Find user by UUID
-            $user = User::query()->visibleTo(auth()->user())->where('uuid', trim($this->scannedUuid))->first();
+            $user = User::query()->visibleTo(auth()->user(), 'attendance.record')->where('uuid', trim($this->scannedUuid))->first();
 
             if (! $user) {
                 $this->messageType = 'error';
@@ -318,6 +352,7 @@ class ViewEvent extends Component
     {
         Gate::authorize('attendance.record');
         $expectation = $this->event->attendanceExpectations()->findOrFail($expectationId);
+        abort_unless(auth()->user()->canAccessMember($expectation->user, 'attendance.record'), 403);
         $analytics->correctExpectation($expectation, $status);
         $this->event->refresh();
         $this->messageType = 'success';
@@ -326,14 +361,18 @@ class ViewEvent extends Component
 
     public function render()
     {
-        $this->event->load(['audienceRules', 'attendanceExpectations.user', 'attendanceExpectations.groups']);
+        $this->event->load(['audienceRules', 'tags']);
+        $requiredRoster = $this->event->attendanceExpectations()
+            ->whereHas('user', fn ($query) => $query->visibleTo(auth()->user(), 'attendance.view'))
+            ->with(['user', 'groups'])
+            ->get();
+
         return view('livewire.attendance.view-event', [
             'event' => $this->event,
-            'attendanceRoles' => User::ROLES,
+            'attendanceRoles' => Role::query()->orderByDesc('is_system')->orderBy('id')->get(),
             'attendanceStatuses' => User::STATUSES,
-            'smallGroups' => SmallGroup::query()->visibleTo(auth()->user())->active()->orderBy('name')->get(),
-            'requiredRoster' => $this->event->attendanceExpectations
-                ->filter(fn ($expectation) => auth()->user()->canAccessMember($expectation->user)),
+            'smallGroups' => SmallGroup::query()->visibleTo(auth()->user(), 'attendance.view')->active()->orderBy('name')->get(),
+            'requiredRoster' => $requiredRoster,
         ]);
     }
 }

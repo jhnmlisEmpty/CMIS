@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -18,14 +19,17 @@ class MemberListExportTest extends TestCase
             'role' => User::ROLE_ADMIN,
         ]);
 
-        User::factory()->create([
+        $maria = User::factory()->create([
             'name' => 'Maria Santos',
             'email' => 'maria@example.com',
             'role' => User::ROLE_MEMBER,
             'status' => User::STATUS_ACTIVE,
+            'social_media_url' => 'https://facebook.com/maria.santos',
             'birthdate' => '1995-04-17',
             'address' => '123 Metro Manila Avenue, Barangay Commonwealth, Quezon City, Metro Manila',
         ]);
+        $volunteerTag = Tag::create(['type' => Tag::TYPE_MEMBER, 'name' => 'Volunteer', 'normalized_name' => 'volunteer']);
+        $maria->tags()->attach($volunteerTag);
 
         User::factory()->create([
             'name' => 'Jose Ramos',
@@ -45,6 +49,7 @@ class MemberListExportTest extends TestCase
                 'birthdateTo' => '2005-12-31',
                 'minAge' => 18,
                 'maxAge' => 35,
+                'tagFilter' => $volunteerTag->id,
             ]));
 
         $response->assertOk();
@@ -56,6 +61,10 @@ class MemberListExportTest extends TestCase
         $csv = $response->streamedContent();
 
         $this->assertStringContainsString('Maria Santos', $csv);
+        $this->assertStringContainsString('Social Media Link', $csv);
+        $this->assertStringContainsString('https://facebook.com/maria.santos', $csv);
+        $this->assertStringContainsString('Tags', $csv);
+        $this->assertStringContainsString('Volunteer', $csv);
         $this->assertStringContainsString('Birthdate', $csv);
         $this->assertStringContainsString('1995-04-17', $csv);
         $this->assertStringContainsString('Age', $csv);

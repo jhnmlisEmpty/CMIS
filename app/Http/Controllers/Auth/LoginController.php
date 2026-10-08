@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,7 +20,7 @@ class LoginController extends Controller
         return view('auth.login');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AuditLogger $audit): RedirectResponse
     {
         $credentials = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -28,9 +29,10 @@ class LoginController extends Controller
 
         $name = preg_replace('/\s+/', ' ', trim($credentials['name']));
         $throttleKey = Str::transliterate(Str::lower($name).'|'.$request->ip());
+        $ipThrottleKey = 'login-ip|'.$request->ip();
 
-        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
-            $seconds = RateLimiter::availableIn($throttleKey);
+        if (RateLimiter::tooManyAttempts($throttleKey, 5) || RateLimiter::tooManyAttempts($ipThrottleKey, 20)) {
+            $seconds = max(RateLimiter::availableIn($throttleKey), RateLimiter::availableIn($ipThrottleKey));
 
             throw ValidationException::withMessages([
                 'name' => "Too many sign-in attempts. Try again in {$seconds} seconds.",
@@ -46,6 +48,8 @@ class LoginController extends Controller
 
         if ($matches->count() !== 1) {
             RateLimiter::hit($throttleKey, 60);
+            RateLimiter::hit($ipThrottleKey, 300);
+            $audit->log('login_failed', 'authentication', 'Failed sign-in attempt', null, [], ['name' => $name]);
 
             throw ValidationException::withMessages([
                 'name' => 'We could not verify those member details.',
@@ -53,16 +57,23 @@ class LoginController extends Controller
         }
 
         RateLimiter::clear($throttleKey);
-        Auth::login($matches->first(), $request->boolean('remember'));
+        RateLimiter::clear($ipThrottleKey);
+        $user = $matches->first();
+        Auth::login($user, $request->boolean('remember') && ! $user->isAdmin());
         $request->session()->regenerate();
+        $audit->log('login', 'authentication', $user->name.' signed in', $user, [], [], $user->id);
 
-        $destination = $matches->first()->can('dashboard.view') ? route('home') : route('profile');
+        $destination = $user->can('dashboard.view') ? route('home') : route('profile');
 
         return redirect()->intended($destination);
     }
 
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request, AuditLogger $audit): RedirectResponse
     {
+        $user = $request->user();
+        if ($user) {
+            $audit->log('logout', 'authentication', $user->name.' signed out', $user, [], [], $user->id);
+        }
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

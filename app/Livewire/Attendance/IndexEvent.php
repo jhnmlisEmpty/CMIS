@@ -3,6 +3,7 @@
 namespace App\Livewire\Attendance;
 
 use App\Models\Event;
+use App\Models\Tag;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -20,6 +21,8 @@ class IndexEvent extends Component
 
     public string $typeFilter = '';
 
+    public string $tagFilter = '';
+
     public string $sortBy = 'event_date';
 
     public string $sortDirection = 'desc';
@@ -29,6 +32,7 @@ class IndexEvent extends Component
     protected $queryString = [
         'search' => ['except' => ''],
         'typeFilter' => ['except' => ''],
+        'tagFilter' => ['except' => ''],
         'sortBy' => ['except' => 'event_date'],
         'sortDirection' => ['except' => 'desc'],
     ];
@@ -39,6 +43,11 @@ class IndexEvent extends Component
     }
 
     public function updatingTypeFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingTagFilter(): void
     {
         $this->resetPage();
     }
@@ -55,7 +64,7 @@ class IndexEvent extends Component
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'typeFilter']);
+        $this->reset(['search', 'typeFilter', 'tagFilter']);
         $this->resetPage();
     }
 
@@ -72,11 +81,16 @@ class IndexEvent extends Component
     public function render()
     {
         $events = Event::query()
+            ->with('tags')
             ->when($this->search, function ($query) {
-                $query->where('title', 'like', "%{$this->search}%")
-                    ->orWhere('location', 'like', "%{$this->search}%");
+                $query->where(function ($query): void {
+                    $query->where('title', 'like', "%{$this->search}%")
+                        ->orWhere('location', 'like', "%{$this->search}%")
+                        ->orWhereHas('tags', fn ($tagQuery) => $tagQuery->where('name', 'like', "%{$this->search}%"));
+                });
             })
             ->when($this->typeFilter, fn ($query) => $query->where('event_type', $this->typeFilter))
+            ->when($this->tagFilter, fn ($query) => $query->whereHas('tags', fn ($tagQuery) => $tagQuery->whereKey($this->tagFilter)))
             ->orderBy($this->sortBy, $this->sortDirection)
             ->paginate($this->perPage);
 
@@ -85,6 +99,7 @@ class IndexEvent extends Component
         return view('livewire.attendance.index-event', [
             'events' => $events,
             'types' => $types,
+            'tags' => Tag::forType(Tag::TYPE_EVENT)->orderBy('name')->get(),
         ]);
     }
 }

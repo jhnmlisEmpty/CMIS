@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Attendance\CreateEvent;
 use App\Models\Attendance;
 use App\Models\Event;
 use App\Models\EventAttendanceExpectation;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Services\AttendanceAnalyticsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class AttendanceAnalyticsTest extends TestCase
@@ -31,7 +33,8 @@ class AttendanceAnalyticsTest extends TestCase
         $member = User::factory()->create(['role' => User::ROLE_MEMBER]);
         $other = User::factory()->create(['role' => User::ROLE_MEMBER]);
         $inactive = User::factory()->inactive()->create(['role' => User::ROLE_MEMBER]);
-        $group = SmallGroup::create(['name' => 'Grace Group', 'leader_id' => $leader->id, 'status' => 'active']);
+        $group = SmallGroup::create(['name' => 'Grace Group', 'status' => 'active']);
+        $group->leaders()->attach($leader);
         SmallGroupMember::create(['small_group_id' => $group->id, 'user_id' => $member->id, 'status' => 'active', 'joined_at' => now()]);
 
         $first = $this->requiredEvent('First gathering', '2026-09-16', 8, 15);
@@ -110,6 +113,36 @@ class AttendanceAnalyticsTest extends TestCase
             'score_after' => 100,
         ]);
         $this->assertSame(100, $member->fresh()->engagementStat->current_score);
+    }
+
+    public function test_required_attendance_can_only_target_all_active_roles_or_groups(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)
+            ->test(CreateEvent::class)
+            ->set('title', 'Role Required Event')
+            ->set('event_date', now()->addDay()->toDateString())
+            ->set('location', 'Main hall')
+            ->set('event_type', 'service')
+            ->set('attendance_required', true)
+            ->set('selectedRoles', [User::ROLE_MEMBER])
+            ->assertSee('Roles')
+            ->assertSee('Cell groups')
+            ->assertDontSee('Specific members')
+            ->call('submit')
+            ->assertHasNoErrors();
+
+        $event = Event::where('title', 'Role Required Event')->firstOrFail();
+        $this->assertDatabaseHas('event_audience_rules', [
+            'event_id' => $event->id,
+            'audience_type' => EventAudienceRule::TYPE_ROLE,
+            'audience_key' => User::ROLE_MEMBER,
+        ]);
+        $this->assertDatabaseMissing('event_audience_rules', [
+            'event_id' => $event->id,
+            'audience_type' => EventAudienceRule::TYPE_USER,
+        ]);
     }
 
     public function test_analytics_workspace_is_visible_to_admins_and_forbidden_to_unpermitted_members(): void

@@ -26,7 +26,7 @@ class ViewUser extends Component
 
         if (auth()->id() !== $user->id) {
             Gate::authorize('users.view');
-            abort_unless(auth()->user()->canAccessMember($user), 403);
+            abort_unless(auth()->user()->canAccessMember($user, 'users.view'), 403);
         }
 
         $this->user = $user;
@@ -34,10 +34,14 @@ class ViewUser extends Component
 
     public function render()
     {
-        $this->user->loadMissing(['engagementStat', 'smallGroupMemberships.smallGroup']);
+        $this->user->loadMissing(['engagementStat', 'smallGroupMemberships.smallGroup', 'tags', 'roles']);
+        $canViewGrowth = auth()->id() === $this->user->id
+            || auth()->user()->canAccessMember($this->user, 'analytics.view');
         $settings = AnalyticsSetting::current();
         $cutoff = now()->subDays($settings->rolling_days)->startOfDay();
-        $history = $this->user->attendanceExpectations()->whereNotNull('finalized_at')->with('event')->latest('finalized_at')->get();
+        $history = $canViewGrowth
+            ? $this->user->attendanceExpectations()->whereNotNull('finalized_at')->with('event')->latest('finalized_at')->get()
+            : collect();
         $recent = $history->filter(fn ($item) => $item->event->event_date->gte($cutoff));
         $recentPresent = $recent->where('status', EventAttendanceExpectation::STATUS_PRESENT)->count();
         $recentTotal = $recent->whereIn('status', [EventAttendanceExpectation::STATUS_PRESENT, EventAttendanceExpectation::STATUS_ABSENT])->count();
@@ -53,22 +57,25 @@ class ViewUser extends Component
 
         $activeMembershipIds = $this->user->smallGroupMemberships->where('status', 'active')->pluck('id');
         $publishedLessonCount = Lesson::published()->count();
-        $completedLessons = SmallGroupMemberProgress::query()->whereIn('small_group_member_id', $activeMembershipIds)->where('status', 'completed')->count();
+        $completedLessons = $canViewGrowth
+            ? SmallGroupMemberProgress::query()->whereIn('small_group_member_id', $activeMembershipIds)->where('status', 'completed')->count()
+            : 0;
         $lessonOpportunities = $activeMembershipIds->count() * $publishedLessonCount;
 
         $groupIds = $this->user->smallGroupMemberships->where('status', 'active')->pluck('small_group_id')->map(fn ($id) => (string) $id);
-        $upcomingEvents = Event::query()->where('attendance_required', true)->whereDate('event_date', '>=', today())
-            ->where(function ($query) use ($groupIds): void {
+        $roleSlugs = $this->user->roles->pluck('slug');
+        $upcomingEvents = $canViewGrowth ? Event::query()->where('attendance_required', true)->whereDate('event_date', '>=', today())
+            ->where(function ($query) use ($groupIds, $roleSlugs): void {
                 $query->whereHas('attendanceExpectations', fn ($expectation) => $expectation->where('user_id', $this->user->id))
-                    ->orWhereHas('audienceRules', function ($rules) use ($groupIds): void {
+                    ->orWhereHas('audienceRules', function ($rules) use ($groupIds, $roleSlugs): void {
                         $rules->where('audience_type', EventAudienceRule::TYPE_ALL_ACTIVE)
-                            ->orWhere(fn ($q) => $q->where('audience_type', EventAudienceRule::TYPE_ROLE)->where('audience_key', $this->user->role))
+                            ->orWhere(fn ($q) => $q->where('audience_type', EventAudienceRule::TYPE_ROLE)->whereIn('audience_key', $roleSlugs))
                             ->orWhere(fn ($q) => $q->where('audience_type', EventAudienceRule::TYPE_USER)->where('audience_key', (string) $this->user->id));
                         if ($groupIds->isNotEmpty()) {
                             $rules->orWhere(fn ($q) => $q->where('audience_type', EventAudienceRule::TYPE_SMALL_GROUP)->whereIn('audience_key', $groupIds));
                         }
                     });
-            })->orderBy('event_date')->limit(5)->get();
+            })->orderBy('event_date')->limit(5)->get() : collect();
 
         return view('livewire.user.view-user', [
             'growth' => [
@@ -85,6 +92,7 @@ class ViewUser extends Component
             'attendanceHistory' => $history->take(10),
             'upcomingRequiredEvents' => $upcomingEvents,
             'memberTrend' => $memberTrend,
+            'canViewGrowth' => $canViewGrowth,
         ]);
     }
 }

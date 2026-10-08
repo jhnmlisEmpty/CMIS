@@ -1,6 +1,6 @@
 <x-layouts.app>
     <x-slot:headerTitle>Dashboard</x-slot:headerTitle>
-    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    <x-slot:headerSubtitle>{{ $churchSettings->name }}</x-slot:headerSubtitle>
 
     @php
         $hasUsers = \Illuminate\Support\Facades\Schema::hasTable('users');
@@ -33,7 +33,7 @@
                 <p>Keep people connected, prepare upcoming gatherings, and support every small group from one shared workspace.</p>
                 <div class="home-hero-actions">
                     @can('events.create')<a href="{{ route('events.create') }}" class="event-button-primary" wire:navigate><x-heroicon-o-plus />Create event</a>@endcan
-                    @if(Gate::allows('users.create') && ! auth()->user()->isSmallGroupLeader())<a href="{{ route('users.create') }}" class="home-hero-secondary" wire:navigate>Add member</a>@endif
+                    @can('users.create')<a href="{{ route('users.create') }}" class="home-hero-secondary" wire:navigate>Add member</a>@endcan
                 </div>
             </div>
             <div class="home-hero-note"><span>{{ now()->format('l') }}</span><strong>{{ now()->format('d') }}</strong><small>{{ now()->format('F Y') }}</small></div>

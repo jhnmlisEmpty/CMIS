@@ -3,8 +3,11 @@
 namespace App\Livewire\Attendance;
 
 use App\Livewire\Concerns\ManagesEventAudience;
+use App\Livewire\Concerns\ManagesTags;
 use App\Models\Event;
+use App\Models\Tag;
 use App\Services\AttendanceAnalyticsService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -14,7 +17,8 @@ use Livewire\Component;
 #[Title('Edit Event')]
 class UpdateEvent extends Component
 {
-    use ManagesEventAudience;
+    use ManagesEventAudience, ManagesTags;
+
     public Event $event;
 
     public string $title = '';
@@ -27,6 +31,11 @@ class UpdateEvent extends Component
 
     public string $event_type = '';
 
+    protected function tagType(): string
+    {
+        return Tag::TYPE_EVENT;
+    }
+
     protected function rules(): array
     {
         return array_merge([
@@ -35,7 +44,7 @@ class UpdateEvent extends Component
             'event_date' => 'required|date',
             'location' => 'required|string|max:255',
             'event_type' => 'required|string|max:255',
-        ], $this->audienceRules());
+        ], $this->audienceRules(), $this->tagRules());
     }
 
     public function mount(Event $event): void
@@ -46,13 +55,14 @@ class UpdateEvent extends Component
         $this->event_date = $event->event_date->format('Y-m-d');
         $this->location = $event->location;
         $this->event_type = $event->event_type;
+        $this->tag_ids = $event->tags()->pluck('tags.id')->all();
         $this->loadEventAudience($event->load('audienceRules'));
     }
 
     public function submit(AttendanceAnalyticsService $analytics): void
     {
         Gate::authorize('events.update');
-        $this->validate();
+        $validated = $this->validate();
         if (! $this->event->isAudienceLocked() && ! $this->validateAudienceSelection()) {
             return;
         }
@@ -70,19 +80,25 @@ class UpdateEvent extends Component
                 'absence_penalty_points' => $this->absence_penalty_points,
             ];
         }
-        $this->event->update($values);
-        if (! $this->event->isAudienceLocked()) {
-            $this->syncAudienceRules($this->event);
-            if ($this->event->attendance_required && $this->event->event_date->isToday()) {
-                $analytics->snapshotEvent($this->event);
+        DB::transaction(function () use ($analytics, $validated, $values): void {
+            $this->event->update($values);
+            $this->syncTags($this->event, $validated['tag_ids'], $validated['pending_tags']);
+            if (! $this->event->isAudienceLocked()) {
+                $this->syncAudienceRules($this->event);
+                if ($this->event->attendance_required && $this->event->event_date->isToday()) {
+                    $analytics->snapshotEvent($this->event);
+                }
             }
-        }
+        });
         session()->flash('success', 'Event updated successfully!');
         $this->redirect(route('events.index'), navigate: true);
     }
 
     public function render()
     {
-        return view('livewire.attendance.update-event', $this->audienceOptions());
+        return view('livewire.attendance.update-event', [
+            ...$this->audienceOptions(),
+            ...$this->tagViewData(),
+        ]);
     }
 }

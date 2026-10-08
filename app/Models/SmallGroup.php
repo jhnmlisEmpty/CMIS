@@ -2,20 +2,24 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Concerns\Auditable;
+use App\Services\AccessManager;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 class SmallGroup extends Model
 {
-    use HasFactory;
+    use Auditable, HasFactory;
 
     /**
      * Status constants
      */
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_INACTIVE = 'inactive';
 
     public const STATUSES = [
@@ -30,16 +34,23 @@ class SmallGroup extends Model
         'name',
         'photo_path',
         'description',
-        'leader_id',
         'status',
     ];
 
     /**
-     * Get the leader of the small group.
+     * Get the leaders of the small group.
      */
-    public function leader(): BelongsTo
+    public function leaders(): BelongsToMany
     {
-        return $this->belongsTo(User::class, 'leader_id');
+        return $this->belongsToMany(User::class, 'small_group_leaders')
+            ->withTimestamps();
+    }
+
+    public function tags(): MorphToMany
+    {
+        return $this->morphToMany(Tag::class, 'taggable')
+            ->where('tags.type', Tag::TYPE_SMALL_GROUP)
+            ->withTimestamps();
     }
 
     /**
@@ -77,10 +88,8 @@ class SmallGroup extends Model
         return $query->where('status', self::STATUS_ACTIVE);
     }
 
-    public function scopeVisibleTo(Builder $query, ?User $viewer): Builder
+    public function scopeVisibleTo(Builder $query, ?User $viewer, string $permission = 'small_groups.view'): Builder
     {
-        return $viewer?->isSmallGroupLeader()
-            ? $query->where('leader_id', $viewer->id)
-            : $query;
+        return app(AccessManager::class)->scopeSmallGroups($query, $viewer, $permission);
     }
 }

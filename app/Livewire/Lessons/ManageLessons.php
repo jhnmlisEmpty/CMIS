@@ -2,8 +2,12 @@
 
 namespace App\Livewire\Lessons;
 
+use App\Livewire\Concerns\ManagesTags;
 use App\Models\Lesson;
 use App\Models\SmallGroup;
+use App\Models\Tag;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -14,16 +18,35 @@ use Livewire\Component;
 #[Title('Lessons | True Vine World Harvest Church - Pangasinan')]
 class ManageLessons extends Component
 {
+    use ManagesTags;
+
     public bool $showForm = false;
+
     public ?int $editingLessonId = null;
+
     public string $title = '';
+
     public string $description = '';
+
     public int $order = 1;
+
     public string $content = '';
+
     public string $status = Lesson::STATUS_DRAFT;
 
     #[Url]
+    public string $search = '';
+
+    #[Url]
+    public string $tagFilter = '';
+
+    #[Url]
     public ?int $edit = null;
+
+    protected function tagType(): string
+    {
+        return Tag::TYPE_LESSON;
+    }
 
     public function mount(): void
     {
@@ -41,6 +64,7 @@ class ManageLessons extends Component
             'order' => ['required', 'integer', 'min:1'],
             'content' => ['nullable', 'string'],
             'status' => ['required', 'in:'.implode(',', Lesson::STATUSES)],
+            ...$this->tagRules(),
         ];
     }
 
@@ -55,6 +79,9 @@ class ManageLessons extends Component
     public function editLesson(int $lessonId): void
     {
         Gate::authorize('lessons.update');
+        $this->tagSearch = '';
+        $this->pending_tags = [];
+        $this->resetErrorBag();
         $lesson = Lesson::findOrFail($lessonId);
         $this->editingLessonId = $lesson->id;
         $this->title = $lesson->title;
@@ -62,29 +89,37 @@ class ManageLessons extends Component
         $this->order = $lesson->order;
         $this->content = $lesson->content ?? '';
         $this->status = $lesson->status;
+        $this->tag_ids = $lesson->tags()->pluck('tags.id')->all();
         $this->showForm = true;
     }
 
     public function save(): void
     {
         $validated = $this->validate();
+        $tagIds = $validated['tag_ids'];
+        $pendingTags = $validated['pending_tags'];
+        $lessonData = Arr::except($validated, ['tag_ids', 'pending_tags']);
 
-        if ($this->editingLessonId) {
-            Gate::authorize('lessons.update');
-            $lesson = Lesson::findOrFail($this->editingLessonId);
-            if ($lesson->status !== $validated['status']) {
-                Gate::authorize('lessons.publish');
+        DB::transaction(function () use ($lessonData, $pendingTags, $tagIds): void {
+            if ($this->editingLessonId) {
+                Gate::authorize('lessons.update');
+                $lesson = Lesson::findOrFail($this->editingLessonId);
+                if ($lesson->status !== $lessonData['status']) {
+                    Gate::authorize('lessons.publish');
+                }
+                $lesson->update($lessonData);
+                session()->flash('success', 'Lesson updated successfully. It is now synchronized for every cell group.');
+            } else {
+                Gate::authorize('lessons.create');
+                if ($lessonData['status'] === Lesson::STATUS_PUBLISHED) {
+                    Gate::authorize('lessons.publish');
+                }
+                $lesson = Lesson::create($lessonData);
+                session()->flash('success', 'Lesson created successfully for every cell group.');
             }
-            $lesson->update($validated);
-            session()->flash('success', 'Lesson updated successfully. It is now synchronized for every cell group.');
-        } else {
-            Gate::authorize('lessons.create');
-            if ($validated['status'] === Lesson::STATUS_PUBLISHED) {
-                Gate::authorize('lessons.publish');
-            }
-            Lesson::create($validated);
-            session()->flash('success', 'Lesson created successfully for every cell group.');
-        }
+
+            $this->syncTags($lesson, $tagIds, $pendingTags);
+        });
 
         $this->resetForm();
     }
@@ -101,6 +136,11 @@ class ManageLessons extends Component
         $this->resetForm();
     }
 
+    public function clearFilters(): void
+    {
+        $this->reset(['search', 'tagFilter']);
+    }
+
     public function resetForm(): void
     {
         $this->showForm = false;
@@ -110,11 +150,23 @@ class ManageLessons extends Component
         $this->order = (Lesson::max('order') ?? 0) + 1;
         $this->content = '';
         $this->status = Lesson::STATUS_DRAFT;
+        $this->tagSearch = '';
+        $this->tag_ids = [];
+        $this->pending_tags = [];
+        $this->resetErrorBag();
     }
 
     public function render()
     {
-        $query = Lesson::query()->ordered();
+        $query = Lesson::query()
+            ->with('tags')
+            ->when($this->search !== '', fn ($query) => $query->where(function ($query): void {
+                $query->where('title', 'like', "%{$this->search}%")
+                    ->orWhere('description', 'like', "%{$this->search}%")
+                    ->orWhereHas('tags', fn ($tagQuery) => $tagQuery->where('name', 'like', "%{$this->search}%"));
+            }))
+            ->when($this->tagFilter !== '', fn ($query) => $query->whereHas('tags', fn ($tagQuery) => $tagQuery->whereKey($this->tagFilter)))
+            ->ordered();
         if (! Gate::allows('lessons.update')) {
             $query->published();
         }
@@ -125,6 +177,8 @@ class ManageLessons extends Component
             'totalLessons' => Lesson::count(),
             'publishedLessons' => Lesson::published()->count(),
             'cellGroupCount' => SmallGroup::active()->count(),
+            'filterTags' => Tag::forType(Tag::TYPE_LESSON)->orderBy('name')->get(),
+            ...$this->tagViewData(),
         ]);
     }
 }
