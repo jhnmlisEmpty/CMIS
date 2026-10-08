@@ -76,10 +76,10 @@
                                     @if(in_array($permission, $scopeablePermissions, true))
                                         <label @class(['access-permission', 'access-permission-scoped', 'is-enabled' => $checked]) wire:key="{{ $selectedRoleId }}-{{ $permission }}">
                                             <span><strong>{{ $label }}</strong><small>Core data scope · {{ $permission }}</small>@if($dependencies[$permission] ?? [])<small>Requires {{ collect($dependencies[$permission])->map(fn($key) => collect($permissionGroups)->collapse()[$key] ?? $key)->join(', ') }}</small>@endif</span>
-                                            <select wire:model.change="permissionScopeInputs.{{ str_replace('.', '__', $permission) }}" wire:loading.attr="disabled" aria-label="Access scope for {{ $label }}">
-                                                <option value="none">No access</option>
-                                                <option value="associated">Associated only</option>
-                                                <option value="all">All records</option>
+                                            <select wire:change="setPermissionScope('{{ $permission }}', $event.target.value)" wire:loading.attr="disabled" aria-label="Access scope for {{ $label }}">
+                                                <option value="none" @selected(($permissionScopeInputs[str_replace('.', '__', $permission)] ?? 'none') === 'none')>No access</option>
+                                                <option value="associated" @selected(($permissionScopeInputs[str_replace('.', '__', $permission)] ?? 'none') === 'associated')>Associated only</option>
+                                                <option value="all" @selected(($permissionScopeInputs[str_replace('.', '__', $permission)] ?? 'none') === 'all')>All records</option>
                                             </select>
                                         </label>
                                     @else
