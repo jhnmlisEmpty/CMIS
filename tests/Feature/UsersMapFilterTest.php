@@ -26,9 +26,9 @@ class UsersMapFilterTest extends TestCase
 
         $smallGroup = SmallGroup::create([
             'name' => 'Lingayen Community',
-            'leader_id' => $leader->id,
             'status' => SmallGroup::STATUS_ACTIVE,
         ]);
+        $smallGroup->leaders()->attach($leader);
 
         $matchingBirthdate = now()->subYears(30)->subMonth();
 

@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#173f35">
-    <meta name="description" content="True Vine World Harvest Church - Pangasinan management system for members, groups, events, and attendance.">
-    <link rel="icon" type="image/png" href="{{ asset('images/true-vine-logo.png') }}">
-    <title>{{ $title ?? (($headerTitle ?? null) ? $headerTitle . ' | True Vine World Harvest Church - Pangasinan' : 'True Vine World Harvest Church - Pangasinan') }}</title>
+    <meta name="description" content="{{ $churchSettings->name }} management system for members, groups, events, and attendance.">
+    <link rel="icon" type="image/png" href="{{ $churchSettings->logo_path ? route('church-logo') : asset('images/true-vine-logo.png') }}">
+    @php $resolvedTitle = isset($title) ? preg_replace('/ \| True Vine World Harvest Church - Pangasinan$/', '', $title) : ($headerTitle ?? null); @endphp
+    <title>{{ $resolvedTitle ? $resolvedTitle . ' | ' . $churchSettings->name : $churchSettings->name }}</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=manrope:400,500,600,700,800" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
@@ -29,8 +30,8 @@
     @if($hasWorkspaceAccess)
     <aside class="app-sidebar" aria-label="Primary navigation">
         <a href="{{ $workspaceRoute }}" class="brand-lockup" wire:navigate>
-            <img src="{{ asset('images/true-vine-logo.png') }}" class="brand-logo" alt="True Vine World Harvest Church logo">
-            <span><strong>TVWHC Pangasinan</strong><small>Church Management System</small></span>
+            <img src="{{ $churchSettings->logo_path ? route('church-logo') : asset('images/true-vine-logo.png') }}" class="brand-logo" alt="{{ $churchSettings->name }} logo">
+            <span><strong>{{ $churchSettings->short_name }}</strong><small>Church Management System</small></span>
         </a>
         <nav class="desktop-nav">
             <p class="nav-section-label">Workspace</p>
@@ -52,8 +53,8 @@
             @can('users.view')<a href="{{ route('users.index') }}" class="nav-item {{ request()->routeIs('users.*') ? 'is-active' : '' }}" wire:navigate>
                 <x-heroicon-o-user-group /><span>Members</span>
             </a>@endcan
-            @can('access-control.manage')<a href="{{ route('settings.access-control') }}" class="nav-item {{ request()->routeIs('settings.access-control') ? 'is-active' : '' }}" wire:navigate>
-                <x-heroicon-o-shield-check /><span>Access control</span>
+            @can('access-control.manage')<a href="{{ route('settings.profile') }}" class="nav-item {{ request()->routeIs('settings.*') ? 'is-active' : '' }}" wire:navigate>
+                <x-heroicon-o-cog-6-tooth /><span>Settings</span>
             </a>@endcan
             <p class="nav-section-label nav-section-label-secondary">Account</p>
             <form method="POST" action="{{ route('logout') }}">@csrf
@@ -65,12 +66,12 @@
     </aside>
     @endif
     <header class="app-header">
-        <div class="mobile-brand"><img src="{{ asset('images/true-vine-logo.png') }}" class="mobile-brand-logo" alt="True Vine World Harvest Church logo"><strong>True Vine World Harvest Church</strong></div>
+        <div class="mobile-brand"><img src="{{ $churchSettings->logo_path ? route('church-logo') : asset('images/true-vine-logo.png') }}" class="mobile-brand-logo" alt="{{ $churchSettings->name }} logo"><strong>{{ $churchSettings->short_name }}</strong></div>
         <div class="header-heading"><p>{{ $headerTitle ?? 'Overview' }}</p>@isset($headerSubtitle)<span>{{ $headerSubtitle }}</span>@endisset</div>
         <div class="header-actions">
-            @if(Gate::allows('users.create') && ! auth()->user()->isSmallGroupLeader())
+            @can('users.create')
                 <a href="{{ route('users.create') }}" class="quick-add" wire:navigate><x-heroicon-o-plus /><span>Add member</span></a>
-            @endif
+            @endcan
             <a href="{{ route('profile') }}" class="profile-link" aria-label="Open profile" wire:navigate>@if(auth()->user()?->profile_photo_path)<img src="{{ route('profile-photo', ['filename' => basename(auth()->user()->profile_photo_path)]) }}" alt="{{ auth()->user()->name }}" class="header-profile-photo">@else<span>{{ auth()->check() ? mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) : 'CM' }}</span>@endif</a>
         </div>
     </header>
@@ -83,7 +84,7 @@
         @can('small_groups.view')<a href="{{ route('small-groups.index') }}" class="{{ request()->routeIs('small-groups.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-user-group /><span>Groups</span></a>@endcan
         @can('lessons.view')<a href="{{ route('lessons.index') }}" class="{{ request()->routeIs('lessons.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-book-open /><span>Lessons</span></a>@endcan
         @can('users.view')<a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-user-group /><span>Members</span></a>@endcan
-        @can('access-control.manage')<a href="{{ route('settings.access-control') }}" class="{{ request()->routeIs('settings.access-control') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-shield-check /><span>Access</span></a>@endcan
+        @can('access-control.manage')<a href="{{ route('settings.profile') }}" class="{{ request()->routeIs('settings.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-cog-6-tooth /><span>Settings</span></a>@endcan
         <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit"><x-heroicon-o-arrow-left-start-on-rectangle /><span>Sign out</span></button></form>
     </nav>
     @endif

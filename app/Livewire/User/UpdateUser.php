@@ -2,7 +2,13 @@
 
 namespace App\Livewire\User;
 
+use App\Livewire\Concerns\ManagesTags;
+use App\Models\Role;
+use App\Models\Tag;
 use App\Models\User;
+use App\Services\AccessManager;
+use App\Services\AuditLogger;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -18,6 +24,7 @@ use Livewire\WithFileUploads;
 #[Title('Edit Member')]
 class UpdateUser extends Component
 {
+    use ManagesTags;
     use WithFileUploads;
 
     public User $user;
@@ -36,13 +43,18 @@ class UpdateUser extends Component
 
     public string $phone = '';
 
+    public string $socialMediaUrl = '';
+
     public string $address = '';
 
     public ?float $latitude = null;
 
     public ?float $longitude = null;
 
-    public string $role = 'member';
+    public array $role_ids = [];
+
+    /** @deprecated Compatibility input for older clients; use role_ids. */
+    public string $role = Role::MEMBER;
 
     public string $status = 'active';
 
@@ -59,14 +71,19 @@ class UpdateUser extends Component
 
     public string $streetAddress = '';
 
-    public bool $leaderAssignmentLocked = false;
+    public bool $leaderStatusLocked = false;
 
     public array $ledSmallGroups = [];
+
+    protected function tagType(): string
+    {
+        return Tag::TYPE_MEMBER;
+    }
 
     public function mount(User $user): void
     {
         Gate::authorize('users.update');
-        abort_unless(auth()->user()->canAccessMember($user), 403);
+        abort_unless(auth()->user()->canAccessMember($user, 'users.update'), 403);
         abort_if($user->isAdmin() && ! auth()->user()->isAdmin(), 403);
 
         $this->user = $user;
@@ -75,6 +92,7 @@ class UpdateUser extends Component
         $this->gender = $user->gender ?? '';
         $this->birthdate = $user->birthdate?->format('Y-m-d');
         $this->phone = $user->phone ?? '';
+        $this->socialMediaUrl = $user->social_media_url ?? '';
         $this->address = $user->address ?? '';
         $this->regionCode = $user->region_code ?? '';
         $this->provinceCode = $user->province_code ?? '';
@@ -83,14 +101,28 @@ class UpdateUser extends Component
         $this->streetAddress = $user->street_address ?? '';
         $this->latitude = $user->latitude;
         $this->longitude = $user->longitude;
-        $this->role = $user->role;
+        $this->role_ids = $user->roles()->pluck('roles.id')->map(fn ($id) => (int) $id)->all();
+        $this->role = $user->role ?? Role::MEMBER;
         $this->status = $user->status;
+        $this->tag_ids = $user->tags()->pluck('tags.id')->all();
         $this->ledSmallGroups = $user->ledSmallGroups()
             ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($group): array => ['id' => $group->id, 'name' => $group->name])
+            ->get(['small_groups.id', 'small_groups.name'])
+            ->map(fn ($group): array => [
+                'id' => $group->id,
+                'name' => $group->name,
+                'can_update' => auth()->user()->canAccessSmallGroup($group, 'small_groups.update'),
+            ])
             ->all();
-        $this->leaderAssignmentLocked = $user->isSmallGroupLeader() && count($this->ledSmallGroups) > 0;
+        $this->leaderStatusLocked = count($this->ledSmallGroups) > 0;
+    }
+
+    public function updatedRole(): void
+    {
+        $roleId = Role::query()->where('slug', $this->role)->value('id');
+        if ($roleId) {
+            $this->role_ids = [(int) $roleId];
+        }
     }
 
     /**
@@ -127,31 +159,39 @@ class UpdateUser extends Component
             'gender' => ['required', 'in:male,female'],
             'birthdate' => ['nullable', 'date', 'before:today'],
             'phone' => ['nullable', 'string', 'max:20'],
+            'socialMediaUrl' => ['nullable', 'url:http,https', 'max:2048'],
             'address' => ['nullable', 'string', 'max:500'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'role' => ['required', 'in:'.implode(',', User::ROLES)],
+            'role_ids' => ['required', 'array', 'min:1'],
+            'role_ids.*' => ['integer', Rule::exists('roles', 'id')],
             'status' => ['required', 'in:'.implode(',', User::STATUSES)],
             'regionCode' => ['nullable', 'string'],
             'provinceCode' => ['nullable', 'string'],
             'cityCode' => ['nullable', 'string'],
             'barangayCode' => ['nullable', 'string'],
             'streetAddress' => ['nullable', 'string', 'max:255'],
+            ...$this->tagRules(),
         ];
     }
 
-    public function save(): void
+    public function save(AuditLogger $audit, AccessManager $access): void
     {
         Gate::authorize('users.update');
-        abort_unless(auth()->user()->canAccessMember($this->user), 403);
+        abort_unless(auth()->user()->canAccessMember($this->user, 'users.update'), 403);
         abort_if($this->user->isAdmin() && ! auth()->user()->isAdmin(), 403);
         $validated = $this->validate();
+        $tagIds = $validated['tag_ids'];
+        $pendingTags = $validated['pending_tags'];
+        $previousRoles = $this->user->roles()->pluck('slug')->sort()->values()->all();
+        $canAssignRoles = Gate::allows('users.assign_roles')
+            && $access->canAssignRoles(auth()->user(), $validated['role_ids'], $this->user);
+        abort_if(Gate::allows('users.assign_roles') && ! $canAssignRoles
+            && $this->roleSelectionChanges($validated['role_ids']), 403);
 
-        $effectiveRole = Gate::allows('users.assign_roles') ? $validated['role'] : $this->user->role;
-        $removesGroupLeader = $this->user->isSmallGroupLeader()
-            && ($effectiveRole !== User::ROLE_SMALL_GROUP_LEADER || $validated['status'] !== User::STATUS_ACTIVE)
+        $deactivatesGroupLeader = $validated['status'] !== User::STATUS_ACTIVE
             && $this->user->ledSmallGroups()->exists();
-        abort_if($removesGroupLeader, 422, 'Reassign this leader’s small groups before changing their role or status.');
+        abort_if($deactivatesGroupLeader, 422, 'Remove this leader from their small groups before deactivating the account.');
 
         $data = [
             'name' => $validated['name'],
@@ -159,6 +199,7 @@ class UpdateUser extends Component
             'gender' => $validated['gender'],
             'birthdate' => $validated['birthdate'],
             'phone' => $validated['phone'] ?: null,
+            'social_media_url' => $validated['socialMediaUrl'] ?: null,
             'address' => $validated['address'] ?: null,
             'region_code' => $validated['regionCode'] ?: null,
             'province_code' => $validated['provinceCode'] ?: null,
@@ -170,13 +211,13 @@ class UpdateUser extends Component
             'status' => $validated['status'],
         ];
 
-        if (Gate::allows('users.assign_roles')) {
+        if ($canAssignRoles) {
+            $adminRoleId = Role::query()->where('slug', Role::ADMIN)->value('id');
             $removesFinalActiveAdmin = $this->user->isAdmin()
                 && $this->user->isActive()
-                && ($validated['role'] !== User::ROLE_ADMIN || $validated['status'] !== User::STATUS_ACTIVE)
-                && User::where('role', User::ROLE_ADMIN)->where('status', User::STATUS_ACTIVE)->count() <= 1;
+                && (! in_array((int) $adminRoleId, array_map('intval', $validated['role_ids']), true) || $validated['status'] !== User::STATUS_ACTIVE)
+                && User::where('status', User::STATUS_ACTIVE)->whereHas('roles', fn ($query) => $query->where('slug', Role::ADMIN))->count() <= 1;
             abort_if($removesFinalActiveAdmin, 422, 'The final active administrator cannot be demoted or deactivated.');
-            $data['role'] = $validated['role'];
         }
 
         if (! empty($validated['password'])) {
@@ -185,12 +226,25 @@ class UpdateUser extends Component
 
         if ($this->profilePhoto) {
             if ($this->user->profile_photo_path) {
-                Storage::disk('public')->delete($this->user->profile_photo_path);
+                Storage::disk('local')->delete($this->user->profile_photo_path);
             }
-            $data['profile_photo_path'] = $this->profilePhoto->store('profile-photos', 'public');
+            $data['profile_photo_path'] = $this->profilePhoto->store('profile-photos', 'local');
         }
 
-        $this->user->update($data);
+        DB::transaction(function () use ($data, $tagIds, $pendingTags, $validated, $canAssignRoles, $access): void {
+            $this->user->update($data);
+            if ($canAssignRoles) {
+                $this->user->roles()->sync(array_values(array_unique($validated['role_ids'])));
+                $this->user->unsetRelation('roles');
+                $access->forget($this->user);
+            }
+            $this->syncTags($this->user, $tagIds, $pendingTags);
+        });
+
+        $newRoles = $this->user->roles()->pluck('slug')->sort()->values()->all();
+        if ($previousRoles !== $newRoles) {
+            $audit->log('updated', 'members', 'Roles updated for '.$this->user->name, $this->user, ['roles' => $previousRoles], ['roles' => $newRoles]);
+        }
 
         session()->flash('success', 'Member updated successfully.');
 
@@ -199,10 +253,30 @@ class UpdateUser extends Component
 
     public function render()
     {
+        $canAssignRoles = Gate::allows('users.assign_roles')
+            && app(AccessManager::class)->canAssignRoles(
+                auth()->user(),
+                $this->role_ids,
+                $this->user,
+            );
+
         return view('livewire.user.update-user', [
-            'roles' => User::ROLES,
+            'roles' => Role::query()
+                ->when(! auth()->user()->isAdmin(), fn ($query) => $query->where('slug', '!=', Role::ADMIN))
+                ->orderByDesc('is_system')->orderBy('id')->get(),
+            'canAssignRoles' => $canAssignRoles,
             'statuses' => User::STATUSES,
             'genders' => [User::GENDER_MALE, User::GENDER_FEMALE],
+            ...$this->tagViewData(),
         ]);
+    }
+
+    /** @param list<int|string> $roleIds */
+    private function roleSelectionChanges(array $roleIds): bool
+    {
+        $current = $this->user->roles()->pluck('roles.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+        $requested = collect($roleIds)->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+
+        return $current !== $requested;
     }
 }

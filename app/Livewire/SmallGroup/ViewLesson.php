@@ -19,6 +19,7 @@ class ViewLesson extends Component
     public function mount(SmallGroup $smallGroup, SmallGroupLesson $lesson): void
     {
         abort_unless($lesson->small_group_id === $smallGroup->id, 404);
+        abort_unless(auth()->user()->canAccessSmallGroup($smallGroup, 'small_groups.view'), 403);
         $relations = Gate::allows('lesson_progress.view')
             ? ['smallGroup.members.user', 'progress']
             : ['smallGroup'];
@@ -28,6 +29,7 @@ class ViewLesson extends Component
     public function updateMemberProgress(int $memberId, string $status): void
     {
         Gate::authorize('lesson_progress.update');
+        abort_unless(auth()->user()->canAccessSmallGroup($this->lesson->smallGroup, 'lesson_progress.update'), 403);
         abort_unless($this->lesson->smallGroup->members()->whereKey($memberId)->exists(), 404);
         // Validate status
         if (! in_array($status, SmallGroupMemberProgress::STATUSES)) {
@@ -59,6 +61,7 @@ class ViewLesson extends Component
     public function getMemberProgress(int $memberId): string
     {
         Gate::authorize('lesson_progress.view');
+        abort_unless(auth()->user()->canAccessSmallGroup($this->lesson->smallGroup, 'lesson_progress.view'), 403);
         abort_unless($this->lesson->smallGroup->members()->whereKey($memberId)->exists(), 404);
         $progress = $this->lesson->progress->where('small_group_member_id', $memberId)->first();
 

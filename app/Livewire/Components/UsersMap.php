@@ -2,11 +2,12 @@
 
 namespace App\Livewire\Components;
 
+use App\Models\Role;
 use App\Models\SmallGroup;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
 class UsersMap extends Component
@@ -39,6 +40,8 @@ class UsersMap extends Component
 
     public string $smallGroupFilter = '';
 
+    public string $tagFilter = '';
+
     private const FILTER_PROPERTIES = [
         'search',
         'locationFilter',
@@ -49,6 +52,7 @@ class UsersMap extends Component
         'roleFilter',
         'statusFilter',
         'smallGroupFilter',
+        'tagFilter',
     ];
 
     public function mount(
@@ -69,15 +73,18 @@ class UsersMap extends Component
     public function getFilteredUsersProperty()
     {
         return User::query()
-            ->visibleTo(auth()->user())
+            ->visibleTo(auth()->user(), 'users.map')
             ->with(['smallGroups' => function ($query) {
                 $query->where('small_group_members.status', 'active')
                     ->where('small_groups.status', 'active');
-            }])
+            }, 'tags'])
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->when($this->search, function ($query) {
-                $query->where('name', 'like', "%{$this->search}%");
+                $query->where(function ($query): void {
+                    $query->where('name', 'like', "%{$this->search}%")
+                        ->orWhereHas('tags', fn ($tagQuery) => $tagQuery->where('name', 'like', "%{$this->search}%"));
+                });
             })
             ->when($this->locationFilter, function ($query) {
                 $query->where(function ($q) {
@@ -97,7 +104,7 @@ class UsersMap extends Component
             ->when($this->minAge !== '' || $this->maxAge !== '', function ($query) {
                 $this->applyAgeFilter($query);
             })
-            ->when($this->roleFilter, fn ($query) => $query->where('role', $this->roleFilter))
+            ->when($this->roleFilter, fn ($query) => $query->whereHas('roles', fn ($roleQuery) => $roleQuery->where('slug', $this->roleFilter)))
             ->when($this->statusFilter, fn ($query) => $query->where('status', $this->statusFilter))
             ->when($this->smallGroupFilter, function ($query) {
                 $query->whereHas('smallGroups', function ($groupQuery) {
@@ -105,8 +112,10 @@ class UsersMap extends Component
                         ->where('small_group_members.status', 'active');
                 });
             })
+            ->when($this->tagFilter, fn ($query) => $query->whereHas('tags', fn ($tagQuery) => $tagQuery->whereKey($this->tagFilter)))
             ->orderBy('name')
-            ->get(['id', 'uuid', 'name', 'profile_photo_path', 'email', 'birthdate', 'phone', 'address', 'latitude', 'longitude', 'role', 'status']);
+            ->with('roles')
+            ->get(['id', 'uuid', 'name', 'profile_photo_path', 'email', 'birthdate', 'phone', 'address', 'latitude', 'longitude', 'status']);
     }
 
     public function getUsersForMapProperty(): array
@@ -116,7 +125,9 @@ class UsersMap extends Component
                 'id' => $user->id,
                 'uuid' => $user->uuid,
                 'name' => $user->name,
-                'profilePhotoUrl' => $user->profile_photo_path ? Storage::disk('public')->url($user->profile_photo_path) : null,
+                'profilePhotoUrl' => $user->profile_photo_path
+                    ? route('profile-photo', ['filename' => basename($user->profile_photo_path)])
+                    : null,
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'address' => $user->address,
@@ -124,9 +135,10 @@ class UsersMap extends Component
                 'age' => $user->age,
                 'latitude' => (float) $user->latitude,
                 'longitude' => (float) $user->longitude,
-                'role' => $user->role,
+                'role' => $user->roles->pluck('name')->join(', '),
                 'status' => $user->status,
                 'smallGroup' => $user->smallGroups->first()?->name,
+                'tags' => $user->tags->pluck('name')->all(),
                 'viewUrl' => route('users.show', $user),
             ];
         })->toArray();
@@ -150,6 +162,7 @@ class UsersMap extends Component
         $this->roleFilter = '';
         $this->statusFilter = 'active';
         $this->smallGroupFilter = '';
+        $this->tagFilter = '';
 
         $this->dispatchMapUpdate();
     }
@@ -210,10 +223,11 @@ class UsersMap extends Component
         return view('livewire.components.users-map', [
             'users' => $this->filteredUsers,
             'usersForMap' => $this->usersForMap,
-            'roles' => User::ROLES,
+            'roles' => Role::query()->orderByDesc('is_system')->orderBy('id')->get(),
             'statuses' => User::STATUSES,
-            'smallGroups' => SmallGroup::query()->visibleTo(auth()->user())->active()->orderBy('name')->get(),
-            'totalWithLocation' => User::query()->visibleTo(auth()->user())->whereNotNull('latitude')->whereNotNull('longitude')->count(),
+            'smallGroups' => SmallGroup::query()->visibleTo(auth()->user(), 'small_groups.view')->active()->orderBy('name')->get(),
+            'tags' => Tag::forType(Tag::TYPE_MEMBER)->orderBy('name')->get(),
+            'totalWithLocation' => User::query()->visibleTo(auth()->user(), 'users.map')->whereNotNull('latitude')->whereNotNull('longitude')->count(),
         ]);
     }
 }

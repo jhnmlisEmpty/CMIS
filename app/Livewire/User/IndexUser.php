@@ -2,6 +2,8 @@
 
 namespace App\Livewire\User;
 
+use App\Models\Tag;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -24,6 +26,8 @@ class IndexUser extends Component
 
     public string $smallGroupFilter = '';
 
+    public string $tagFilter = '';
+
     public string $locationFilter = '';
 
     public string $birthdateFrom = '';
@@ -45,6 +49,7 @@ class IndexUser extends Component
         'roleFilter' => ['except' => ''],
         'statusFilter' => ['except' => ''],
         'smallGroupFilter' => ['except' => ''],
+        'tagFilter' => ['except' => ''],
         'locationFilter' => ['except' => ''],
         'birthdateFrom' => ['except' => ''],
         'birthdateTo' => ['except' => ''],
@@ -70,6 +75,11 @@ class IndexUser extends Component
     }
 
     public function updatingSmallGroupFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingTagFilter(): void
     {
         $this->resetPage();
     }
@@ -111,7 +121,7 @@ class IndexUser extends Component
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'roleFilter', 'statusFilter', 'smallGroupFilter', 'locationFilter', 'birthdateFrom', 'birthdateTo', 'minAge', 'maxAge']);
+        $this->reset(['search', 'roleFilter', 'statusFilter', 'smallGroupFilter', 'tagFilter', 'locationFilter', 'birthdateFrom', 'birthdateTo', 'minAge', 'maxAge']);
         $this->resetPage();
     }
 
@@ -121,9 +131,10 @@ class IndexUser extends Component
         $user = User::find($userId);
 
         if ($user && $user->id !== auth()->id()) {
-            abort_unless(auth()->user()->canAccessMember($user), 403);
+            abort_unless(auth()->user()->canAccessMember($user, 'users.delete'), 403);
             abort_if($user->isAdmin() && ! auth()->user()->isAdmin(), 403);
-            abort_if($user->isAdmin() && User::where('role', User::ROLE_ADMIN)->where('status', User::STATUS_ACTIVE)->count() <= 1, 422, 'The final active administrator cannot be deleted.');
+            abort_if($user->isAdmin() && $user->isActive() && User::where('status', User::STATUS_ACTIVE)->whereHas('roles', fn ($query) => $query->where('slug', Role::ADMIN))->count() <= 1, 422, 'The final active administrator cannot be deleted.');
+            abort_if($user->ledSmallGroups()->exists(), 422, 'Remove this leader from their small groups before deleting the account.');
             $user->delete();
             session()->flash('success', 'User deleted successfully.');
         }
@@ -167,20 +178,22 @@ class IndexUser extends Component
     public function render()
     {
         $users = User::query()
-            ->visibleTo(auth()->user())
+            ->visibleTo(auth()->user(), 'users.view')
             ->with(['smallGroups' => function ($query) {
                 $query->where('small_group_members.status', 'active')
                     ->where('small_groups.status', 'active');
-            }])
+            }, 'tags', 'roles'])
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('name', 'like', "%{$this->search}%")
                         ->orWhere('email', 'like', "%{$this->search}%")
                         ->orWhere('phone', 'like', "%{$this->search}%")
-                        ->orWhere('address', 'like', "%{$this->search}%");
+                        ->orWhere('social_media_url', 'like', "%{$this->search}%")
+                        ->orWhere('address', 'like', "%{$this->search}%")
+                        ->orWhereHas('tags', fn ($tagQuery) => $tagQuery->where('name', 'like', "%{$this->search}%"));
                 });
             })
-            ->when($this->roleFilter, fn ($query) => $query->where('role', $this->roleFilter))
+            ->when($this->roleFilter, fn ($query) => $query->whereHas('roles', fn ($roleQuery) => $roleQuery->where('slug', $this->roleFilter)))
             ->when($this->statusFilter, fn ($query) => $query->where('status', $this->statusFilter))
             ->when($this->smallGroupFilter, function ($query) {
                 $query->whereHas('smallGroups', function ($groupQuery) {
@@ -188,6 +201,7 @@ class IndexUser extends Component
                         ->where('small_group_members.status', 'active');
                 });
             })
+            ->when($this->tagFilter, fn ($query) => $query->whereHas('tags', fn ($tagQuery) => $tagQuery->whereKey($this->tagFilter)))
             ->when($this->locationFilter, function ($query) {
                 $query->where(function ($q) {
                     $q->where('address', 'like', "%{$this->locationFilter}%")
@@ -207,9 +221,10 @@ class IndexUser extends Component
 
         return view('livewire.user.index-user', [
             'users' => $users,
-            'roles' => User::ROLES,
+            'roles' => Role::query()->orderByDesc('is_system')->orderBy('id')->get(),
             'statuses' => User::STATUSES,
             'smallGroups' => \App\Models\SmallGroup::query()->visibleTo(auth()->user())->active()->orderBy('name')->get(),
+            'tags' => Tag::forType(Tag::TYPE_MEMBER)->orderBy('name')->get(),
         ]);
     }
 }

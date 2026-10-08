@@ -2,9 +2,9 @@
 
 namespace App\Livewire\SmallGroup;
 
-use App\Models\SmallGroup;
-use App\Models\Lesson;
 use App\Models\EventAttendanceExpectation;
+use App\Models\Lesson;
+use App\Models\SmallGroup;
 use App\Models\SmallGroupMemberProgress;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -19,29 +19,41 @@ class ViewSmallGroup extends Component
 
     public function mount(SmallGroup $smallGroup): void
     {
-        abort_unless(auth()->user()->canAccessSmallGroup($smallGroup), 403);
-        $this->smallGroup = $smallGroup->load(['leader', 'members.user']);
-        $this->loadSharedLessons();
+        abort_unless(auth()->user()->canAccessSmallGroup($smallGroup, 'small_groups.view'), 403);
+        $this->smallGroup = $smallGroup->load(['leaders', 'tags']);
+        if (auth()->user()->canAccessSmallGroup($smallGroup, 'group_members.view')) {
+            $this->smallGroup->load('members.user');
+        } else {
+            $this->smallGroup->setRelation('members', collect());
+        }
+        $this->loadSharedLessons(auth()->user()->canAccessSmallGroup($smallGroup, 'lesson_progress.view'));
     }
 
     public function deleteLesson(int $lessonId): void
     {
         Gate::authorize('lessons.delete');
-        abort_unless(auth()->user()->canAccessSmallGroup($this->smallGroup), 403);
+        abort_unless(auth()->user()->canAccessSmallGroup($this->smallGroup, 'small_groups.view'), 403);
         Lesson::findOrFail($lessonId)->delete();
-        $this->loadSharedLessons();
+        $this->loadSharedLessons(auth()->user()->canAccessSmallGroup($this->smallGroup, 'lesson_progress.view'));
         session()->flash('success', 'Lesson deleted successfully.');
     }
 
-    private function loadSharedLessons(): void
+    private function loadSharedLessons(bool $withProgress): void
     {
-        $this->smallGroup->setRelation('lessons', Lesson::ordered()->with('progress')->get());
+        $this->smallGroup->setRelation('lessons', Lesson::ordered()
+            ->when($withProgress, fn ($query) => $query->with('progress'))
+            ->get());
     }
 
     public function render()
     {
+        $canViewAnalytics = auth()->user()->canAccessSmallGroup($this->smallGroup, 'analytics.view');
+        $canViewMembers = auth()->user()->canAccessSmallGroup($this->smallGroup, 'group_members.view');
+        $canViewLessonProgress = auth()->user()->canAccessSmallGroup($this->smallGroup, 'lesson_progress.view');
         $activeMemberIds = $this->smallGroup->members->where('status', 'active')->pluck('id');
-        $attendance = EventAttendanceExpectation::query()->whereHas('groups', fn ($query) => $query->whereKey($this->smallGroup->id))->whereNotNull('finalized_at')->get();
+        $attendance = $canViewAnalytics
+            ? EventAttendanceExpectation::query()->whereHas('groups', fn ($query) => $query->whereKey($this->smallGroup->id))->whereNotNull('finalized_at')->get()
+            : collect();
         $present = $attendance->where('status', 'present')->count();
         $attendanceTotal = $attendance->whereIn('status', ['present', 'absent'])->count();
         $publishedLessons = Lesson::published()->count();
@@ -57,6 +69,10 @@ class ViewSmallGroup extends Component
                 'completed_lessons' => $completed,
                 'lesson_total' => $lessonTotal,
             ],
+            'canViewAnalytics' => $canViewAnalytics,
+            'canViewMembers' => $canViewMembers,
+            'canViewLessonProgress' => $canViewLessonProgress,
+            'canUpdateGroup' => auth()->user()->canAccessSmallGroup($this->smallGroup, 'small_groups.update'),
         ]);
     }
 }

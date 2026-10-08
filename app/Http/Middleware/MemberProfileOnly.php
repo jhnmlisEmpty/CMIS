@@ -16,6 +16,7 @@ class MemberProfileOnly
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->user()?->hasRole(User::ROLE_MEMBER)
+            && $request->user()->roles()->count() === 1
             && ! $request->routeIs('profile*')) {
             return redirect()->route('profile');
         }

@@ -45,6 +45,7 @@
                     <div class="event-field"><label for="order">Sequence</label><p class="event-field-hint">Where this appears in the teaching plan.</p><input id="order" type="number" min="1" wire:model="order">@error('order')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
                     @can('lessons.publish')<div class="event-field"><label for="status">Visibility</label><p class="event-field-hint">Drafts stay hidden from view-only roles.</p><select id="status" wire:model="status">@foreach($statuses as $lessonStatus)<option value="{{ $lessonStatus }}">{{ ucfirst($lessonStatus) }}</option>@endforeach</select></div>@else<input type="hidden" wire:model="status">@endcan
                     <div class="event-field event-field-wide"><label for="description">Leader summary</label><p class="event-field-hint">Explain the lesson’s focus in one or two sentences.</p><textarea id="description" rows="3" wire:model="description" placeholder="What should leaders understand before teaching this lesson?"></textarea>@error('description')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
+                    @include('livewire.partials.tag-picker', ['tagLabel' => 'Lesson tags', 'tagHelp' => 'Add reusable labels that help leaders find related teaching material.', 'tagInputId' => 'lesson-tag-search'])
                     <div class="event-field event-field-wide lesson-editor-field" wire:ignore
                          x-data="{ editor: null, content: @entangle('content'), init() { let data = {}; try { data = this.content ? JSON.parse(this.content) : {}; } catch (e) { data = {}; } this.editor = new window.EditorJS({ holder: 'shared-lesson-editor-{{ $editingLessonId ?? 'new' }}', tools: window.EditorJSTools, data, placeholder: 'Start with the main scripture, discussion points, or teaching notes…', onChange: async () => { this.content = JSON.stringify(await this.editor.save()); } }); } }">
                         <div class="lesson-editor-label"><div><label>Teaching material</label><p class="event-field-hint">Use headings, lists, quotes, and highlighted notes to make the lesson easy to lead.</p></div><span>Shared with all groups</span></div>
@@ -58,18 +59,23 @@
 
     <section class="lesson-library" aria-labelledby="lessons-title">
         <header class="lesson-library-heading"><div><span class="lesson-kicker">Teaching sequence</span><h2 id="lessons-title">Curriculum library</h2><p>Open a lesson to read the material or review progress by cell group.</p></div><span class="lesson-count">{{ $lessons->count() }} {{ Str::plural('lesson', $lessons->count()) }}</span></header>
+        <div class="lesson-library-tools">
+            <label class="event-search" for="lesson-search"><x-heroicon-o-magnifying-glass aria-hidden="true" /><span class="sr-only">Search lessons</span><input id="lesson-search" type="search" wire:model.live.debounce.300ms="search" placeholder="Search lesson or tag"></label>
+            <label class="event-type-filter" for="lesson-tag-filter"><span class="sr-only">Filter by lesson tag</span><select id="lesson-tag-filter" wire:model.live="tagFilter"><option value="">All lesson tags</option>@foreach($filterTags as $tag)<option value="{{ $tag->id }}">{{ $tag->name }}</option>@endforeach</select><x-heroicon-o-chevron-down aria-hidden="true" /></label>
+            @if($search !== '' || $tagFilter !== '')<button type="button" wire:click="clearFilters">Clear filters</button>@endif
+        </div>
         @if($lessons->isNotEmpty())
             <ol class="lesson-library-list">
                 @foreach($lessons as $lesson)
                     <li class="lesson-library-item">
-                        <a href="{{ route('lessons.show', $lesson) }}" class="lesson-library-main" wire:navigate><span class="lesson-sequence"><small>Lesson</small>{{ str_pad($lesson->order, 2, '0', STR_PAD_LEFT) }}</span><span class="lesson-library-copy"><strong>{{ $lesson->title }}</strong><small>{{ $lesson->description ?: 'No leader summary has been added yet.' }}</small></span></a>
+                        <a href="{{ route('lessons.show', $lesson) }}" class="lesson-library-main" wire:navigate><span class="lesson-sequence"><small>Lesson</small>{{ str_pad($lesson->order, 2, '0', STR_PAD_LEFT) }}</span><span class="lesson-library-copy"><strong>{{ $lesson->title }}</strong><small>{{ $lesson->description ?: 'No leader summary has been added yet.' }}</small>@if($lesson->tags->isNotEmpty())<span class="group-row-tags">@foreach($lesson->tags as $tag)<span class="group-tag-badge">{{ $tag->name }}</span>@endforeach</span>@endif</span></a>
                         <div class="lesson-library-meta"><span @class(['lesson-state', 'is-published' => $lesson->status === 'published'])><i></i>{{ ucfirst($lesson->status) }}</span><span class="lesson-completions">{{ $lesson->completed_count }} completed</span></div>
                         <div class="event-row-actions lesson-row-actions"><a href="{{ route('lessons.show', $lesson) }}" title="Open {{ $lesson->title }}" wire:navigate><x-heroicon-o-arrow-up-right /></a>@can('lessons.update')<button wire:click="editLesson({{ $lesson->id }})" title="Edit {{ $lesson->title }}"><x-heroicon-o-pencil-square /></button>@endcan @can('lessons.delete')<button wire:click="deleteLesson({{ $lesson->id }})" wire:confirm="Delete {{ $lesson->title }}? This will also remove its progress records." title="Delete {{ $lesson->title }}"><x-heroicon-o-trash /></button>@endcan</div>
                     </li>
                 @endforeach
             </ol>
         @else
-            <div class="lesson-empty-state"><span><x-heroicon-o-book-open /></span><div><h3>Your shared curriculum starts here</h3><p>Create the first lesson, keep it as a draft while preparing, then publish it to every cell group.</p></div>@can('lessons.create')<button wire:click="showCreateForm" class="event-button-primary">Create first lesson</button>@endcan</div>
+            <div class="lesson-empty-state"><span><x-heroicon-o-book-open /></span><div><h3>{{ $search !== '' || $tagFilter !== '' ? 'No matching lessons' : 'Your shared curriculum starts here' }}</h3><p>{{ $search !== '' || $tagFilter !== '' ? 'Try another search or clear the filters to see the full curriculum.' : 'Create the first lesson, keep it as a draft while preparing, then publish it to every cell group.' }}</p></div>@if($search !== '' || $tagFilter !== '')<button type="button" wire:click="clearFilters" class="event-button-secondary">Clear filters</button>@else @can('lessons.create')<button wire:click="showCreateForm" class="event-button-primary">Create first lesson</button>@endcan @endif</div>
         @endif
     </section>
 </div>

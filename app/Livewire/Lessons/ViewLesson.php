@@ -23,10 +23,10 @@ class ViewLesson extends Component
     public function mount(Lesson $lesson): void
     {
         abort_unless($lesson->isPublished() || Gate::allows('lessons.update'), 404);
-        $this->lesson = $lesson;
+        $this->lesson = $lesson->load('tags');
 
         if (! $this->groupId && Gate::allows('lesson_progress.view')) {
-            $this->groupId = SmallGroup::query()->visibleTo(auth()->user())->active()->value('id');
+            $this->groupId = SmallGroup::query()->visibleTo(auth()->user(), 'lesson_progress.view')->active()->value('id');
         }
     }
 
@@ -39,7 +39,7 @@ class ViewLesson extends Component
     {
         Gate::authorize('lesson_progress.update');
         abort_unless(in_array($status, SmallGroupMemberProgress::STATUSES, true), 422);
-        $group = $this->selectedGroup();
+        $group = $this->selectedGroup('lesson_progress.update');
         abort_unless($group && $group->members()->whereKey($memberId)->exists(), 404);
 
         $progress = SmallGroupMemberProgress::firstOrNew([
@@ -52,34 +52,36 @@ class ViewLesson extends Component
         $this->lesson->refresh();
     }
 
-    private function selectedGroup(): ?SmallGroup
+    private function selectedGroup(string $permission): ?SmallGroup
     {
         if (! $this->groupId) {
             return null;
         }
 
         return SmallGroup::query()
-            ->visibleTo(auth()->user())
+            ->visibleTo(auth()->user(), $permission)
             ->with(['members.user'])
             ->find($this->groupId);
     }
 
     public function render()
     {
-        $group = Gate::allows('lesson_progress.view') ? $this->selectedGroup() : null;
+        $group = Gate::allows('lesson_progress.view') ? $this->selectedGroup('lesson_progress.view') : null;
         $progress = $group ? $this->lesson->progress()->whereIn('small_group_member_id', $group->members->pluck('id'))->get() : collect();
         $completedCount = $progress->where('status', 'completed')->count();
         $inProgressCount = $progress->where('status', 'in_progress')->count();
         $totalMembers = $group?->members->count() ?? 0;
 
         return view('livewire.lessons.view-lesson', [
-            'groups' => Gate::allows('lesson_progress.view') ? SmallGroup::query()->visibleTo(auth()->user())->active()->orderBy('name')->get() : collect(),
+            'groups' => Gate::allows('lesson_progress.view') ? SmallGroup::query()->visibleTo(auth()->user(), 'lesson_progress.view')->active()->orderBy('name')->get() : collect(),
             'group' => $group,
             'progress' => $progress,
             'totalMembers' => $totalMembers,
             'completedCount' => $completedCount,
             'inProgressCount' => $inProgressCount,
             'notStartedCount' => max(0, $totalMembers - $completedCount - $inProgressCount),
+            'canUpdateProgress' => $group
+                && auth()->user()->canAccessSmallGroup($group, 'lesson_progress.update'),
         ]);
     }
 }

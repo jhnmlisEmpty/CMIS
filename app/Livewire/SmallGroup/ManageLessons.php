@@ -40,6 +40,7 @@ class ManageLessons extends Component
 
     public function mount(SmallGroup $smallGroup): void
     {
+        abort_unless(auth()->user()->canAccessSmallGroup($smallGroup, 'small_groups.view'), 403);
         $this->smallGroup = $smallGroup->load(['lessons', 'members.user']);
         $this->order = $smallGroup->lessons->count() + 1;
 
@@ -160,6 +161,7 @@ class ManageLessons extends Component
     public function updateMemberProgress(int $memberId, int $lessonId, string $status): void
     {
         Gate::authorize('lesson_progress.update');
+        abort_unless(auth()->user()->canAccessSmallGroup($this->smallGroup, 'lesson_progress.update'), 403);
         abort_unless(in_array($status, SmallGroupMemberProgress::STATUSES, true), 422);
         abort_unless($this->smallGroup->members()->whereKey($memberId)->exists(), 404);
         abort_unless($this->smallGroup->lessons()->whereKey($lessonId)->exists(), 404);

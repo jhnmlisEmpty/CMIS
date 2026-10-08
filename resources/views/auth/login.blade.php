@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#173f35">
-    <meta name="description" content="Sign in to the True Vine World Harvest Church - Pangasinan management system.">
-    <link rel="icon" type="image/png" href="{{ asset('images/true-vine-logo.png') }}">
-    <title>Sign in | True Vine World Harvest Church - Pangasinan</title>
+    <meta name="description" content="Sign in to the {{ $churchSettings->name }} management system.">
+    <link rel="icon" type="image/png" href="{{ $churchSettings->logo_path ? route('church-logo') : asset('images/true-vine-logo.png') }}">
+    <title>Sign in | {{ $churchSettings->name }}</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=manrope:400,500,600,700,800" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -16,8 +16,8 @@
     <main class="login-shell">
         <section class="login-story" aria-labelledby="welcome-title">
             <div class="login-brand">
-                <img src="{{ asset('images/true-vine-logo.png') }}" class="login-logo" alt="True Vine World Harvest Church - Pangasinan">
-                <p class="login-kicker">True Vine World Harvest Church - Pangasinan</p>
+                <img src="{{ $churchSettings->logo_path ? route('church-logo') : asset('images/true-vine-logo.png') }}" class="login-logo" alt="{{ $churchSettings->name }}">
+                <p class="login-kicker">{{ $churchSettings->name }}</p>
             </div>
             <div class="login-message">
                 <h1 id="welcome-title">People, gatherings, and care in one place.</h1>

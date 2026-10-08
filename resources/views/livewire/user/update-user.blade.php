@@ -1,6 +1,6 @@
 <div class="event-page member-page">
     <x-slot:headerTitle>Edit Member</x-slot:headerTitle>
-    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    <x-slot:headerSubtitle>{{ $churchSettings->name }}</x-slot:headerSubtitle>
     
     <x-page-header title="Edit member" :subtitle="'Keep ' . $user->name . '’s profile and account access accurate.'" :backRoute="route('users.show', $user)" backLabel="Member details" />
 
@@ -10,7 +10,7 @@
             @if($user->profile_photo_path)<img src="{{ route('profile-photo', ['filename' => basename($user->profile_photo_path)]) }}" alt="{{ $user->name }}" class="member-editor-avatar member-photo">@else<span class="member-editor-avatar">{{ collect(explode(' ', $user->name))->map(fn($part) => mb_substr($part, 0, 1))->take(2)->join('') }}</span>@endif
             <h2>{{ $user->name }}</h2>
             <p>Profile changes are reflected in attendance, small groups, and member location tools.</p>
-            <dl class="event-editor-summary"><div><dt>Joined</dt><dd>{{ $user->created_at?->format('M j, Y') ?? '—' }}</dd></div><div><dt>Member ID</dt><dd>#{{ str_pad($user->id, 4, '0', STR_PAD_LEFT) }}</dd></div></dl>
+        <dl class="event-editor-summary"><div><dt>Joined</dt><dd>{{ $user->created_at?->format($churchSettings->date_format) ?? '—' }}</dd></div><div><dt>Member ID</dt><dd>#{{ str_pad($user->id, 4, '0', STR_PAD_LEFT) }}</dd></div></dl>
         </aside>
 
         <div class="member-form-stack">
@@ -21,6 +21,8 @@
                     <div class="event-field event-field-wide"><label for="profilePhoto">Profile picture</label><p class="event-field-hint">Upload a new JPG, PNG, or WEBP image up to 5 MB.</p><input type="file" id="profilePhoto" wire:model="profilePhoto" accept="image/jpeg,image/png,image/webp" class="@error('profilePhoto') is-invalid @enderror">@error('profilePhoto')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror<div wire:loading wire:target="profilePhoto" class="event-field-hint">Uploading…</div></div>
                     <div class="event-field"><label for="email">Email address <span aria-hidden="true">*</span></label><p class="event-field-hint">Used for contact and account identification.</p><input type="email" id="email" wire:model="email" placeholder="name@example.com" autocomplete="email" class="@error('email') is-invalid @enderror">@error('email')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
                     <div class="event-field"><label for="phone">Phone number</label><p class="event-field-hint">Include the country code when possible.</p><input type="tel" id="phone" wire:model="phone" placeholder="+63 9XX XXX XXXX" autocomplete="tel" class="@error('phone') is-invalid @enderror">@error('phone')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
+                    <div class="event-field event-field-wide"><label for="socialMediaUrl">Social media link</label><p class="event-field-hint">Add a public Facebook, Instagram, LinkedIn, or other profile URL.</p><input type="url" id="socialMediaUrl" wire:model="socialMediaUrl" placeholder="https://facebook.com/username" autocomplete="url" class="@error('socialMediaUrl') is-invalid @enderror">@error('socialMediaUrl')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
+                    @include('livewire.partials.tag-picker', ['tagLabel' => 'Member tags', 'tagHelp' => 'Add staff-managed labels that help organize the member directory.', 'tagInputId' => 'member-tag-search'])
                     <div class="event-field"><label for="gender">Gender <span aria-hidden="true">*</span></label><p class="event-field-hint">Select the member’s gender.</p><select id="gender" wire:model="gender" class="@error('gender') is-invalid @enderror"><option value="">Select gender</option>@foreach($genders as $gender)<option value="{{ $gender }}">{{ ucfirst($gender) }}</option>@endforeach</select>@error('gender')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
                     <div class="event-field"><label for="birthdate">Birthdate</label><p class="event-field-hint">Used for member records and sign-in.</p><input type="date" id="birthdate" wire:model="birthdate" autocomplete="bday" class="@error('birthdate') is-invalid @enderror">@error('birthdate')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
                 </div>
@@ -42,22 +44,22 @@
                 <div class="event-form member-fields">
                     <div class="event-field"><label for="password">New password</label><p class="event-field-hint">Leave blank to keep the current password.</p><input type="password" id="password" wire:model="password" placeholder="Enter a new password" autocomplete="new-password" class="@error('password') is-invalid @enderror">@error('password')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
                     <div class="event-field"><label for="password_confirmation">Confirm new password</label><p class="event-field-hint">Required only when changing the password.</p><input type="password" id="password_confirmation" wire:model="password_confirmation" placeholder="Confirm new password" autocomplete="new-password"></div>
-                    @if($leaderAssignmentLocked)
+                    @if($leaderStatusLocked)
                         <div class="member-leader-lock event-field-wide" role="note" aria-labelledby="leader-lock-title">
                             <span><x-heroicon-o-lock-closed aria-hidden="true" /></span>
                             <div>
-                                <strong id="leader-lock-title">Role and status are locked</strong>
-                                <p>This user currently leads {{ count($ledSmallGroups) === 1 ? 'a small group' : count($ledSmallGroups).' small groups' }}. Reassign {{ count($ledSmallGroups) === 1 ? 'that group' : 'those groups' }} before changing this account’s role or status.</p>
+                                <strong id="leader-lock-title">Status is locked</strong>
+                                <p>This user currently leads {{ count($ledSmallGroups) === 1 ? 'a small group' : count($ledSmallGroups).' small groups' }}. Remove this user from {{ count($ledSmallGroups) === 1 ? 'that group' : 'those groups' }} before deactivating the account.</p>
                                 <ul>
                                     @foreach($ledSmallGroups as $group)
-                                        <li>@can('small_groups.update')<a href="{{ route('small-groups.edit', $group['id']) }}" wire:navigate>{{ $group['name'] }} <x-heroicon-o-arrow-up-right /></a>@else<span>{{ $group['name'] }}</span>@endcan</li>
+                                        <li>@if($group['can_update'])<a href="{{ route('small-groups.edit', $group['id']) }}" wire:navigate>{{ $group['name'] }} <x-heroicon-o-arrow-up-right /></a>@else<span>{{ $group['name'] }}</span>@endif</li>
                                     @endforeach
                                 </ul>
                             </div>
                         </div>
                     @endif
-                    @can('users.assign_roles')<div @class(['event-field', 'is-locked' => $leaderAssignmentLocked])><label for="role">Role <span aria-hidden="true">*</span></label><p class="event-field-hint">{{ $leaderAssignmentLocked ? 'Reassign the listed groups to unlock this field.' : 'Controls access and responsibilities.' }}</p><select id="role" wire:model="role" @disabled($leaderAssignmentLocked) class="@error('role') is-invalid @enderror">@foreach($roles as $role)<option value="{{ $role }}">{{ ucwords(str_replace('_', ' ', $role)) }}</option>@endforeach</select>@error('role')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>@endcan
-                    <div @class(['event-field', 'is-locked' => $leaderAssignmentLocked])><label for="status">Status <span aria-hidden="true">*</span></label><p class="event-field-hint">{{ $leaderAssignmentLocked ? 'Reassign the listed groups to unlock this field.' : 'Only active members can use the system.' }}</p><select id="status" wire:model="status" @disabled($leaderAssignmentLocked) class="@error('status') is-invalid @enderror">@foreach($statuses as $status)<option value="{{ $status }}">{{ ucfirst($status) }}</option>@endforeach</select>@error('status')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
+                    @if($canAssignRoles)<fieldset class="event-field event-field-wide member-role-picker"><legend>Roles <span aria-hidden="true">*</span></legend><p class="event-field-hint">Permissions from every selected role are combined.</p><div class="member-role-options">@foreach($roles as $role)<label><input type="checkbox" value="{{ $role->id }}" wire:model="role_ids"><span><strong>{{ $role->name }}</strong><small>{{ $role->is_system ? 'System role' : 'Custom role' }}</small></span></label>@endforeach</div>@error('role_ids')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror @error('role_ids.*')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</fieldset>@endif
+                    <div @class(['event-field', 'is-locked' => $leaderStatusLocked])><label for="status">Status <span aria-hidden="true">*</span></label><p class="event-field-hint">{{ $leaderStatusLocked ? 'Remove the listed leadership assignments to unlock this field.' : 'Only active members can use the system.' }}</p><select id="status" wire:model="status" @disabled($leaderStatusLocked) class="@error('status') is-invalid @enderror">@foreach($statuses as $status)<option value="{{ $status }}">{{ ucfirst($status) }}</option>@endforeach</select>@error('status')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
                 </div>
                 <div class="event-form-actions member-form-actions"><a href="{{ route('users.show', $user) }}" class="event-button-secondary" wire:navigate>Cancel</a><button type="submit" class="event-button-primary" wire:loading.attr="disabled" wire:target="save"><span wire:loading.remove wire:target="save">Save changes</span><span wire:loading wire:target="save">Saving…</span><x-heroicon-o-chevron-right wire:loading.remove wire:target="save" /></button></div>
             </section>

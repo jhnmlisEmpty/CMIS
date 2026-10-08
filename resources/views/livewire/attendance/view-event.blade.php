@@ -1,6 +1,6 @@
 <div class="event-page event-detail-page">
     <x-slot:headerTitle>Event Details</x-slot:headerTitle>
-    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    <x-slot:headerSubtitle>{{ $churchSettings->name }}</x-slot:headerSubtitle>
 
     <x-page-header
         :title="$event->title"
@@ -42,6 +42,7 @@
         </div>
         <div class="event-detail-copy">
             <span class="event-type-badge">{{ ucfirst($event->event_type) }}</span>
+            @if($event->tags->isNotEmpty())<div class="group-detail-tags" aria-label="Event tags">@foreach($event->tags as $tag)<span class="group-tag-badge">{{ $tag->name }}</span>@endforeach</div>@endif
             <p>{{ $eventDate->format('l, F j, Y') }}</p>
             <div>
                 <x-heroicon-o-map-pin aria-hidden="true" />
@@ -172,14 +173,23 @@
     <section class="event-attendance-panel" aria-labelledby="checked-in-title">
         <div class="event-section-heading">
             <div><span class="event-section-index">{{ $attendances->count() > 0 ? '04' : '03' }}</span><h2 id="checked-in-title">Checked-in members</h2></div>
-            <p>{{ $attendances->count() }} {{ Str::plural('record', $attendances->count()) }}</p>
+            <div class="event-section-heading-actions">
+                <p>{{ $attendances->count() }} {{ Str::plural('record', $attendances->count()) }}</p>
+                @if($attendances->isNotEmpty())
+                    <button type="button" class="event-button-secondary event-download-button" wire:click="downloadCheckIns" wire:loading.attr="disabled" wire:target="downloadCheckIns">
+                        <x-heroicon-o-arrow-down-tray wire:loading.remove wire:target="downloadCheckIns" aria-hidden="true" />
+                        <span wire:loading.remove wire:target="downloadCheckIns">Download CSV</span>
+                        <span wire:loading wire:target="downloadCheckIns">Preparing…</span>
+                    </button>
+                @endif
+            </div>
         </div>
 
         <div class="event-attendance-filters">
             <div class="member-filter-group event-attendance-filter-group">
                 <div class="member-filter-row member-filter-row-primary">
                     <label class="event-search" for="attendance-member-search"><x-heroicon-o-magnifying-glass aria-hidden="true" /><span class="sr-only">Search checked-in members</span><input id="attendance-member-search" type="search" wire:model.live.debounce.300ms="attendanceSearch" placeholder="Search name, email, phone"></label>
-                    <label class="event-type-filter" for="attendance-role-filter"><span class="sr-only">Filter by role</span><select id="attendance-role-filter" wire:model.live="attendanceRoleFilter"><option value="">All roles</option>@foreach($attendanceRoles as $role)<option value="{{ $role }}">{{ ucwords(str_replace('_', ' ', $role)) }}</option>@endforeach</select><x-heroicon-o-chevron-down /></label>
+                    <label class="event-type-filter" for="attendance-role-filter"><span class="sr-only">Filter by role</span><select id="attendance-role-filter" wire:model.live="attendanceRoleFilter"><option value="">All roles</option>@foreach($attendanceRoles as $role)<option value="{{ $role->slug }}">{{ $role->name }}</option>@endforeach</select><x-heroicon-o-chevron-down /></label>
                     <label class="event-type-filter" for="attendance-small-group-filter"><span class="sr-only">Filter by small group</span><select id="attendance-small-group-filter" wire:model.live="attendanceSmallGroupFilter"><option value="">All small groups</option>@foreach($smallGroups as $smallGroup)<option value="{{ $smallGroup->id }}">{{ $smallGroup->name }}</option>@endforeach</select><x-heroicon-o-chevron-down /></label>
                 </div>
                 <div class="member-filter-row member-filter-row-secondary">
@@ -203,7 +213,7 @@
         @if($attendances->count() > 0)
             <div class="event-attendance-table-wrap">
                 <table class="event-attendance-table">
-                    <thead><tr><th>Member</th><th>Small group</th><th>Phone</th><th>Check-in</th><th><span class="sr-only">Actions</span></th></tr></thead>
+                    <thead><tr><th>Member</th><th>Small group</th><th>Tags</th><th>Phone</th><th>Check-in</th><th><span class="sr-only">Actions</span></th></tr></thead>
                     <tbody>
                         @foreach($attendances as $attendance)
                             <tr>
@@ -214,9 +224,10 @@
                                     </div>
                                 </td>
                                 <td>@if($attendance->user->smallGroups->count() > 0)<span class="event-type-badge">{{ $attendance->user->smallGroups->first()->name }}</span>@else<span class="event-muted">No group</span>@endif</td>
+                                <td><div class="record-tag-cell">@forelse($attendance->user->tags as $tag)<span class="group-tag-badge">{{ $tag->name }}</span>@empty<span class="group-tag-badge is-empty">No tags</span>@endforelse</div></td>
                                 <td>{{ $attendance->user->phone ?: '—' }}</td>
-                                <td><time datetime="{{ $attendance->check_in_time->toIso8601String() }}"><strong>{{ $attendance->check_in_time->format('M j, Y') }}</strong><small>{{ $attendance->check_in_time->format('g:i A') }}</small></time></td>
-                                <td>@can('users.view')<a href="{{ route('users.show', $attendance->user->id) }}" class="event-icon-button" wire:navigate title="View member" aria-label="View {{ $attendance->user->name }}"><x-heroicon-o-chevron-right /></a>@endcan</td>
+                                <td><time datetime="{{ $attendance->check_in_time->toIso8601String() }}"><strong>{{ $attendance->check_in_time->format($churchSettings->date_format) }}</strong><small>{{ $attendance->check_in_time->format('g:i A') }}</small></time></td>
+                                <td>@if(auth()->user()->canAccessMember($attendance->user, 'users.view'))<a href="{{ route('users.show', $attendance->user->id) }}" class="event-icon-button" wire:navigate title="View member" aria-label="View {{ $attendance->user->name }}"><x-heroicon-o-chevron-right /></a>@endif</td>
                             </tr>
                         @endforeach
                     </tbody>

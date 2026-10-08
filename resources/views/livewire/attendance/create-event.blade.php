@@ -1,6 +1,6 @@
 <div class="event-page">
     <x-slot:headerTitle>Create Event</x-slot:headerTitle>
-    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    <x-slot:headerSubtitle>{{ $churchSettings->name }}</x-slot:headerSubtitle>
 
     <x-page-header
         title="Create an event"
@@ -67,6 +67,8 @@
                     </div>
                     @error('location')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror
                 </div>
+
+                @include('livewire.partials.tag-picker', ['tagLabel' => 'Event tags', 'tagHelp' => 'Add reusable labels for finding related gatherings.', 'tagInputId' => 'event-tag-search'])
 
                 @include('livewire.attendance.partials.attendance-requirements')
 

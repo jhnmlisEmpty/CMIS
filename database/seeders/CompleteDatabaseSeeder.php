@@ -9,6 +9,7 @@ use App\Models\EventAttendanceExpectation;
 use App\Models\EventAudienceRule;
 use App\Models\Lesson;
 use App\Models\MemberEngagementStat;
+use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\SmallGroup;
 use App\Models\SmallGroupMember;
@@ -56,9 +57,10 @@ class CompleteDatabaseSeeder extends Seeder
 
         $users = [];
         foreach ($accounts as $index => $account) {
-            $users[$account['email']] = User::updateOrCreate(
-                ['email' => $account['email']],
-                [
+            $user = User::firstOrNew(['email' => $account['email']]);
+            $isNew = ! $user->exists;
+            if ($isNew) {
+                $user->fill([
                     'uuid' => (string) Str::uuid(),
                     'name' => $account['name'],
                     'email_verified_at' => now(),
@@ -74,10 +76,12 @@ class CompleteDatabaseSeeder extends Seeder
                     'street_address' => ($index + 1).' Faith Street',
                     'latitude' => 16.6159 + ($index * 0.001),
                     'longitude' => 120.3167 + ($index * 0.001),
-                    'role' => $account['role'],
                     'status' => $index === 19 ? User::STATUS_INACTIVE : User::STATUS_ACTIVE,
-                ],
-            );
+                    'role' => $account['role'],
+                ]);
+                $user->save();
+            }
+            $users[$account['email']] = $user;
         }
 
         return $users;
@@ -102,9 +106,13 @@ class CompleteDatabaseSeeder extends Seeder
         ];
 
         foreach ($rolePermissions as $role => $selectedPermissions) {
+            $roleId = Role::query()->where('slug', $role)->value('id');
+            if (! $roleId || RolePermission::query()->where('role_id', $roleId)->exists()) {
+                continue;
+            }
             foreach (PermissionRegistry::withDependencies($selectedPermissions) as $permission) {
                 RolePermission::updateOrCreate(
-                    ['role' => $role, 'permission' => $permission],
+                    ['role_id' => $roleId, 'permission' => $permission],
                     [],
                 );
             }
@@ -117,18 +125,22 @@ class CompleteDatabaseSeeder extends Seeder
     {
         $groups = [];
         foreach ([
-            ['name' => 'Faith Builders', 'leader' => 'leader@cmis.com', 'status' => SmallGroup::STATUS_ACTIVE],
-            ['name' => 'Young Adults Fellowship', 'leader' => 'member01@cmis.com', 'status' => SmallGroup::STATUS_ACTIVE],
-            ['name' => 'Hope Circle', 'leader' => 'member02@cmis.com', 'status' => SmallGroup::STATUS_INACTIVE],
+            ['name' => 'Faith Builders', 'leaders' => ['leader@cmis.com', 'member01@cmis.com'], 'status' => SmallGroup::STATUS_ACTIVE],
+            ['name' => 'Young Adults Fellowship', 'leaders' => ['member01@cmis.com'], 'status' => SmallGroup::STATUS_ACTIVE],
+            ['name' => 'Hope Circle', 'leaders' => ['member02@cmis.com'], 'status' => SmallGroup::STATUS_INACTIVE],
         ] as $group) {
-            $groups[$group['name']] = SmallGroup::updateOrCreate(
+            $groups[$group['name']] = SmallGroup::firstOrCreate(
                 ['name' => $group['name']],
                 [
                     'description' => 'A welcoming small group for prayer, Bible study, and fellowship.',
-                    'leader_id' => $users[$group['leader']]->id,
                     'status' => $group['status'],
                 ],
             );
+            if ($groups[$group['name']]->wasRecentlyCreated) {
+                $groups[$group['name']]->leaders()->sync(
+                    collect($group['leaders'])->map(fn (string $email) => $users[$email]->id)->all(),
+                );
+            }
         }
 
         return $groups;

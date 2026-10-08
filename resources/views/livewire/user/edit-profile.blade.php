@@ -1,6 +1,6 @@
 <div class="event-page member-page">
     <x-slot:headerTitle>My Profile</x-slot:headerTitle>
-    <x-slot:headerSubtitle>True Vine World Harvest Church - Pangasinan</x-slot:headerSubtitle>
+    <x-slot:headerSubtitle>{{ $churchSettings->name }}</x-slot:headerSubtitle>
 
     <x-page-header title="Edit my profile" subtitle="Keep your personal information and contact details up to date." :backRoute="route('profile')" backLabel="My profile" />
 
@@ -10,7 +10,7 @@
             @if($user->profile_photo_path)<img src="{{ route('profile-photo', ['filename' => basename($user->profile_photo_path)]) }}" alt="{{ $user->name }}" class="member-editor-avatar member-photo">@else<span class="member-editor-avatar" aria-hidden="true">{{ collect(explode(' ', $user->name))->map(fn($part) => mb_substr($part, 0, 1))->take(2)->join('') }}</span>@endif
             <h2>{{ $user->name }}</h2>
             <p>These changes update the information church leaders use to contact and care for you.</p>
-            <dl class="event-editor-summary"><div><dt>Joined</dt><dd>{{ $user->created_at?->format('M j, Y') ?? '—' }}</dd></div><div><dt>Member ID</dt><dd>#{{ str_pad($user->id, 4, '0', STR_PAD_LEFT) }}</dd></div></dl>
+        <dl class="event-editor-summary"><div><dt>Joined</dt><dd>{{ $user->created_at?->format($churchSettings->date_format) ?? '—' }}</dd></div><div><dt>Member ID</dt><dd>#{{ str_pad($user->id, 4, '0', STR_PAD_LEFT) }}</dd></div></dl>
         </aside>
 
         <div class="member-form-stack">
@@ -21,6 +21,7 @@
                     <div class="event-field event-field-wide"><label for="profilePhoto">Profile picture</label><p class="event-field-hint">Optional JPG, PNG, or WEBP image up to 5 MB.</p><input type="file" id="profilePhoto" wire:model="profilePhoto" accept="image/jpeg,image/png,image/webp" class="@error('profilePhoto') is-invalid @enderror">@error('profilePhoto')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror<div wire:loading wire:target="profilePhoto" class="event-field-hint">Uploading…</div></div>
                     <div class="event-field"><label for="email">Email address <span aria-hidden="true">*</span></label><p class="event-field-hint">Used for contact and account identification.</p><input type="email" id="email" wire:model="email" autocomplete="email" class="@error('email') is-invalid @enderror">@error('email')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
                     <div class="event-field"><label for="phone">Phone number</label><p class="event-field-hint">Include the country code when possible.</p><input type="tel" id="phone" wire:model="phone" autocomplete="tel" placeholder="+63 9XX XXX XXXX" class="@error('phone') is-invalid @enderror">@error('phone')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
+                    <div class="event-field event-field-wide"><label for="socialMediaUrl">Social media link</label><p class="event-field-hint">Add a public Facebook, Instagram, LinkedIn, or other profile URL.</p><input type="url" id="socialMediaUrl" wire:model="socialMediaUrl" autocomplete="url" placeholder="https://facebook.com/username" class="@error('socialMediaUrl') is-invalid @enderror">@error('socialMediaUrl')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
                     <div class="event-field"><label for="gender">Gender <span aria-hidden="true">*</span></label><p class="event-field-hint">Select the gender in your member record.</p><select id="gender" wire:model="gender" class="@error('gender') is-invalid @enderror"><option value="">Select gender</option>@foreach($genders as $gender)<option value="{{ $gender }}">{{ ucfirst($gender) }}</option>@endforeach</select>@error('gender')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
                     <div class="event-field"><label for="birthdate">Birthdate</label><p class="event-field-hint">This is also used when signing in.</p><input type="date" id="birthdate" wire:model="birthdate" autocomplete="bday" max="{{ today()->subDay()->format('Y-m-d') }}" class="@error('birthdate') is-invalid @enderror">@error('birthdate')<p class="event-field-error" role="alert">{{ $message }}</p>@enderror</div>
                 </div>

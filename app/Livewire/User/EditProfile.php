@@ -19,22 +19,39 @@ class EditProfile extends Component
     use WithFileUploads;
 
     public $user;
+
     public string $name = '';
+
     public string $email = '';
+
     public string $password = '';
+
     public string $password_confirmation = '';
+
     public string $gender = '';
+
     public ?string $birthdate = null;
+
     public string $phone = '';
+
+    public string $socialMediaUrl = '';
+
     public string $address = '';
+
     public ?float $latitude = null;
+
     public ?float $longitude = null;
+
     public $profilePhoto;
 
     public string $regionCode = '';
+
     public string $provinceCode = '';
+
     public string $cityCode = '';
+
     public string $barangayCode = '';
+
     public string $streetAddress = '';
 
     public function mount(): void
@@ -45,6 +62,7 @@ class EditProfile extends Component
         $this->gender = $this->user->gender ?? '';
         $this->birthdate = $this->user->birthdate?->format('Y-m-d');
         $this->phone = $this->user->phone ?? '';
+        $this->socialMediaUrl = $this->user->social_media_url ?? '';
         $this->address = $this->user->address ?? '';
         $this->regionCode = $this->user->region_code ?? '';
         $this->provinceCode = $this->user->province_code ?? '';
@@ -86,6 +104,7 @@ class EditProfile extends Component
             'gender' => ['required', 'in:male,female'],
             'birthdate' => ['nullable', 'date', 'before:today'],
             'phone' => ['nullable', 'string', 'max:20'],
+            'socialMediaUrl' => ['nullable', 'url:http,https', 'max:2048'],
             'address' => ['nullable', 'string', 'max:500'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -107,6 +126,7 @@ class EditProfile extends Component
             'gender' => $validated['gender'],
             'birthdate' => $validated['birthdate'],
             'phone' => $validated['phone'] ?: null,
+            'social_media_url' => $validated['socialMediaUrl'] ?: null,
             'address' => $validated['address'] ?: null,
             'region_code' => $validated['regionCode'] ?: null,
             'province_code' => $validated['provinceCode'] ?: null,
@@ -123,9 +143,9 @@ class EditProfile extends Component
 
         if ($this->profilePhoto) {
             if ($this->user->profile_photo_path) {
-                Storage::disk('public')->delete($this->user->profile_photo_path);
+                Storage::disk('local')->delete($this->user->profile_photo_path);
             }
-            $data['profile_photo_path'] = $this->profilePhoto->store('profile-photos', 'public');
+            $data['profile_photo_path'] = $this->profilePhoto->store('profile-photos', 'local');
         }
 
         $this->user->update($data);

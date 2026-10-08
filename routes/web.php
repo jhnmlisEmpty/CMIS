@@ -2,14 +2,19 @@
 
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\MemberListExportController;
+use App\Http\Middleware\EnsureActiveUser;
+use App\Livewire\Analytics\AnalyticsDashboard;
 use App\Livewire\Attendance\CreateEvent;
 use App\Livewire\Attendance\IndexEvent;
 use App\Livewire\Attendance\UpdateEvent;
 use App\Livewire\Attendance\ViewEvent;
-use App\Livewire\Analytics\AnalyticsDashboard;
-use App\Livewire\Settings\ManageAccessControl;
 use App\Livewire\Lessons\ManageLessons as GlobalManageLessons;
 use App\Livewire\Lessons\ViewLesson as GlobalViewLesson;
+use App\Livewire\Settings\ManageAccessControl;
+use App\Livewire\Settings\ManageAttendanceDefaults;
+use App\Livewire\Settings\ManageChurchProfile;
+use App\Livewire\Settings\ManageTags;
+use App\Livewire\Settings\ViewAuditLogs;
 use App\Livewire\SmallGroup\CreateSmallGroup;
 use App\Livewire\SmallGroup\IndexSmallGroup;
 use App\Livewire\SmallGroup\ManageMembers;
@@ -21,37 +26,49 @@ use App\Livewire\User\IndexUser;
 use App\Livewire\User\UpdateUser;
 use App\Livewire\User\UserLocationsMap;
 use App\Livewire\User\ViewUser;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+
+Route::get('/church-logo', function () {
+    $setting = \App\Models\ChurchSetting::current();
+    abort_unless($setting->logo_path && Storage::disk('public')->exists($setting->logo_path), 404);
+
+    return response()->file(Storage::disk('public')->path($setting->logo_path));
+})->name('church-logo');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store'])->name('login.store');
 });
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', EnsureActiveUser::class])->group(function () {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
     Route::get('/profile-photos/{filename}', function (string $filename) {
         abort_if($filename === '' || basename($filename) !== $filename, 404);
 
         $path = 'profile-photos/'.$filename;
-        abort_unless(Storage::disk('public')->exists($path), 404);
+        abort_unless(Storage::disk('local')->exists($path), 404);
         $owner = \App\Models\User::where('profile_photo_path', $path)->firstOrFail();
-        abort_unless(auth()->user()->canAccessMember($owner), 403);
+        Gate::authorize('view', $owner);
 
-        return response()->file(Storage::disk('public')->path($path));
+        return response()->file(Storage::disk('local')->path($path), [
+            'Cache-Control' => 'private, max-age=300',
+        ]);
     })->where('filename', '[^/]+')->name('profile-photo');
 
     Route::get('/small-group-photos/{filename}', function (string $filename) {
         abort_if($filename === '' || basename($filename) !== $filename, 404);
 
         $path = 'small-group-photos/'.$filename;
-        abort_unless(Storage::disk('public')->exists($path), 404);
+        abort_unless(Storage::disk('local')->exists($path), 404);
         $smallGroup = \App\Models\SmallGroup::where('photo_path', $path)->firstOrFail();
-        abort_unless(auth()->user()->canAccessSmallGroup($smallGroup), 403);
+        Gate::authorize('view', $smallGroup);
 
-        return response()->file(Storage::disk('public')->path($path));
+        return response()->file(Storage::disk('local')->path($path), [
+            'Cache-Control' => 'private, max-age=300',
+        ]);
     })->where('filename', '[^/]+')->name('small-group-photo');
 
     Route::get('/', function () {
@@ -67,15 +84,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/users/export', MemberListExportController::class)->middleware('can:users.export')->name('users.export');
     Route::get('/users/map', UserLocationsMap::class)->middleware('can:users.map')->name('users.map');
     Route::get('/users/create', CreateUser::class)->middleware('can:users.create')->name('users.create');
-    Route::get('/users/{user}', ViewUser::class)->name('users.show');
-    Route::get('/users/{user}/edit', UpdateUser::class)->middleware('can:users.update')->name('users.edit');
+    Route::get('/users/{user}', ViewUser::class)->middleware('can:view,user')->name('users.show');
+    Route::get('/users/{user}/edit', UpdateUser::class)->middleware(['can:users.update', 'can:update,user'])->name('users.edit');
 
     // Small Group Management
     Route::get('/small-groups', IndexSmallGroup::class)->middleware('can:small_groups.view')->name('small-groups.index');
     Route::get('/small-groups/create', CreateSmallGroup::class)->middleware('can:small_groups.create')->name('small-groups.create');
-    Route::get('/small-groups/{smallGroup}', ViewSmallGroup::class)->middleware('can:small_groups.view')->name('small-groups.show');
-    Route::get('/small-groups/{smallGroup}/edit', UpdateSmallGroup::class)->middleware('can:small_groups.update')->name('small-groups.edit');
-    Route::get('/small-groups/{smallGroup}/members', ManageMembers::class)->middleware('can:group_members.view')->name('small-groups.members');
+    Route::get('/small-groups/{smallGroup}', ViewSmallGroup::class)->middleware(['can:small_groups.view', 'can:view,smallGroup'])->name('small-groups.show');
+    Route::get('/small-groups/{smallGroup}/edit', UpdateSmallGroup::class)->middleware(['can:small_groups.update', 'can:update,smallGroup'])->name('small-groups.edit');
+    Route::get('/small-groups/{smallGroup}/members', ManageMembers::class)->middleware('can:viewMembers,smallGroup')->name('small-groups.members');
 
     // Shared lesson curriculum
     Route::get('/lessons', GlobalManageLessons::class)->middleware('can:lessons.view')->name('lessons.index');
@@ -90,4 +107,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/access-control', ManageAccessControl::class)
         ->middleware('can:access-control.manage')
         ->name('settings.access-control');
+    Route::redirect('/settings', '/settings/profile')->name('settings.index');
+    Route::get('/settings/profile', ManageChurchProfile::class)->middleware('can:access-control.manage')->name('settings.profile');
+    Route::get('/settings/attendance', ManageAttendanceDefaults::class)->middleware('can:access-control.manage')->name('settings.attendance');
+    Route::get('/settings/tags', ManageTags::class)->middleware('can:access-control.manage')->name('settings.tags');
+    Route::get('/settings/audit-logs', ViewAuditLogs::class)->middleware('can:access-control.manage')->name('settings.audit-logs');
 });

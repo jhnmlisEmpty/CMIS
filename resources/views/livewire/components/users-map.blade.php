@@ -5,10 +5,11 @@
             @php $filterId = $this->getId(); @endphp
             <div class="member-filter-group member-map-filter-group">
                 <div class="member-filter-row member-filter-row-primary">
-                    <label class="event-search" for="map-name-{{ $filterId }}"><span class="sr-only">Filter map by member name</span><input type="search" id="map-name-{{ $filterId }}" wire:model.live.debounce.300ms="search" placeholder="Search member name"></label>
-                    <label class="event-type-filter" for="map-role-{{ $filterId }}"><span class="sr-only">Filter map by role</span><select id="map-role-{{ $filterId }}" wire:model.live="roleFilter"><option value="">All roles</option>@foreach($roles as $role)<option value="{{ $role }}">{{ ucwords(str_replace('_', ' ', $role)) }}</option>@endforeach</select></label>
+                    <label class="event-search" for="map-name-{{ $filterId }}"><span class="sr-only">Filter map by member name or tag</span><input type="search" id="map-name-{{ $filterId }}" wire:model.live.debounce.300ms="search" placeholder="Search member or tag"></label>
+                    <label class="event-type-filter" for="map-role-{{ $filterId }}"><span class="sr-only">Filter map by role</span><select id="map-role-{{ $filterId }}" wire:model.live="roleFilter"><option value="">All roles</option>@foreach($roles as $role)<option value="{{ $role->slug }}">{{ $role->name }}</option>@endforeach</select></label>
                     <label class="event-type-filter" for="map-status-{{ $filterId }}"><span class="sr-only">Filter map by status</span><select id="map-status-{{ $filterId }}" wire:model.live="statusFilter"><option value="">All statuses</option>@foreach($statuses as $status)<option value="{{ $status }}">{{ ucfirst($status) }}</option>@endforeach</select></label>
                     <label class="event-type-filter" for="map-small-group-{{ $filterId }}"><span class="sr-only">Filter map by small group</span><select id="map-small-group-{{ $filterId }}" wire:model.live="smallGroupFilter"><option value="">All small groups</option>@foreach($smallGroups as $smallGroup)<option value="{{ $smallGroup->id }}">{{ $smallGroup->name }}</option>@endforeach</select></label>
+                    <label class="event-type-filter" for="map-tag-{{ $filterId }}"><span class="sr-only">Filter map by member tag</span><select id="map-tag-{{ $filterId }}" wire:model.live="tagFilter"><option value="">All member tags</option>@foreach($tags as $tag)<option value="{{ $tag->id }}">{{ $tag->name }}</option>@endforeach</select></label>
                 </div>
                 <div class="member-filter-row member-filter-row-secondary">
                     <label class="event-search" for="map-location-{{ $filterId }}"><span class="sr-only">Filter map by location</span><input type="search" id="map-location-{{ $filterId }}" wire:model.live.debounce.300ms="locationFilter" placeholder="Location"></label>
@@ -38,6 +39,9 @@
                     @endif
                     @if($smallGroupFilter)
                         <span class="member-map-filter-chip">Group: {{ $smallGroups->firstWhere('id', (int) $smallGroupFilter)?->name }}</span>
+                    @endif
+                    @if($tagFilter)
+                        <span class="member-map-filter-chip">Tag: {{ $tags->firstWhere('id', (int) $tagFilter)?->name }}</span>
                     @endif
                     @if($birthdateFrom)
                         <span class="member-map-filter-chip">Born from: {{ $birthdateFrom }}</span>
@@ -113,7 +117,7 @@
                        class="member-map-person"
                        wire:navigate>
                         @if($user->profile_photo_path)<img src="{{ route('profile-photo', ['filename' => basename($user->profile_photo_path)]) }}" alt="{{ $user->name }}" class="event-avatar member-photo">@else<span class="event-avatar">{{ mb_strtoupper(mb_substr($user->name, 0, 1)) }}</span>@endif
-                        <div><strong>{{ $user->name }}</strong><small>{{ $user->address ?? 'No address' }}</small><code>{{ number_format($user->latitude, 4) }}, {{ number_format($user->longitude, 4) }}</code></div>
+                        <div><strong>{{ $user->name }}</strong><small>{{ $user->address ?? 'No address' }}</small>@if($user->tags->isNotEmpty())<span class="group-row-tags">@foreach($user->tags as $tag)<span class="group-tag-badge">{{ $tag->name }}</span>@endforeach</span>@endif<code>{{ number_format($user->latitude, 4) }}, {{ number_format($user->longitude, 4) }}</code></div>
                         <x-heroicon-o-chevron-right />
                     </a>
                 @endforeach

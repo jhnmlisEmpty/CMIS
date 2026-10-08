@@ -4,18 +4,23 @@ namespace App\Livewire\Concerns;
 
 use App\Models\Event;
 use App\Models\EventAudienceRule;
+use App\Models\Role;
 use App\Models\SmallGroup;
-use App\Models\User;
+use Illuminate\Validation\Rule;
 
 trait ManagesEventAudience
 {
     public bool $attendance_required = false;
+
     public int $attendance_reward_points = 10;
+
     public int $absence_penalty_points = 10;
+
     public bool $audience_all_active = false;
+
     public array $selectedRoles = [];
+
     public array $selectedSmallGroups = [];
-    public array $selectedUsers = [];
 
     protected function audienceRules(): array
     {
@@ -25,11 +30,9 @@ trait ManagesEventAudience
             'absence_penalty_points' => ['required_if:attendance_required,true', 'integer', 'min:0', 'max:100'],
             'audience_all_active' => ['boolean'],
             'selectedRoles' => ['array'],
-            'selectedRoles.*' => ['in:'.implode(',', User::ROLES)],
+            'selectedRoles.*' => ['string', Rule::exists('roles', 'slug')],
             'selectedSmallGroups' => ['array'],
             'selectedSmallGroups.*' => ['integer', 'exists:small_groups,id'],
-            'selectedUsers' => ['array'],
-            'selectedUsers.*' => ['integer', 'exists:users,id'],
         ];
     }
 
@@ -39,7 +42,7 @@ trait ManagesEventAudience
             return true;
         }
 
-        if ($this->audience_all_active || $this->selectedRoles || $this->selectedSmallGroups || $this->selectedUsers) {
+        if ($this->audience_all_active || $this->selectedRoles || $this->selectedSmallGroups) {
             return true;
         }
 
@@ -65,9 +68,6 @@ trait ManagesEventAudience
             foreach ($this->selectedSmallGroups as $groupId) {
                 $rules[] = ['audience_type' => EventAudienceRule::TYPE_SMALL_GROUP, 'audience_key' => (string) $groupId];
             }
-            foreach ($this->selectedUsers as $userId) {
-                $rules[] = ['audience_type' => EventAudienceRule::TYPE_USER, 'audience_key' => (string) $userId];
-            }
         }
         $event->audienceRules()->createMany($rules);
     }
@@ -81,15 +81,13 @@ trait ManagesEventAudience
         $this->audience_all_active = $rules->contains('audience_type', EventAudienceRule::TYPE_ALL_ACTIVE);
         $this->selectedRoles = $rules->where('audience_type', EventAudienceRule::TYPE_ROLE)->pluck('audience_key')->all();
         $this->selectedSmallGroups = $rules->where('audience_type', EventAudienceRule::TYPE_SMALL_GROUP)->pluck('audience_key')->map(fn ($id) => (int) $id)->all();
-        $this->selectedUsers = $rules->where('audience_type', EventAudienceRule::TYPE_USER)->pluck('audience_key')->map(fn ($id) => (int) $id)->all();
     }
 
     protected function audienceOptions(): array
     {
         return [
-            'audienceRoles' => User::ROLES,
+            'audienceRoles' => Role::query()->orderByDesc('is_system')->orderBy('id')->get(),
             'audienceGroups' => SmallGroup::query()->visibleTo(auth()->user())->active()->orderBy('name')->get(),
-            'audienceUsers' => User::query()->visibleTo(auth()->user())->where('status', User::STATUS_ACTIVE)->orderBy('name')->get(['id', 'name']),
         ];
     }
 }
