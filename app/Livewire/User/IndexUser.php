@@ -2,8 +2,8 @@
 
 namespace App\Livewire\User;
 
-use App\Models\Tag;
 use App\Models\Role;
+use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -17,6 +17,8 @@ use Livewire\WithPagination;
 class IndexUser extends Component
 {
     use WithPagination;
+
+    private const SORTABLE_COLUMNS = ['created_at', 'name', 'role'];
 
     public string $search = '';
 
@@ -111,6 +113,10 @@ class IndexUser extends Component
 
     public function sort(string $column): void
     {
+        if (! in_array($column, self::SORTABLE_COLUMNS, true)) {
+            return;
+        }
+
         if ($this->sortBy === $column) {
             $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
         } else {
@@ -177,6 +183,11 @@ class IndexUser extends Component
 
     public function render()
     {
+        $sortBy = in_array($this->sortBy, self::SORTABLE_COLUMNS, true)
+            ? $this->sortBy
+            : 'created_at';
+        $sortDirection = $this->sortDirection === 'asc' ? 'asc' : 'desc';
+
         $users = User::query()
             ->visibleTo(auth()->user(), 'users.view')
             ->with(['smallGroups' => function ($query) {
@@ -216,7 +227,20 @@ class IndexUser extends Component
             ->when($this->minAge !== '' || $this->maxAge !== '', function ($query) {
                 $this->applyAgeFilter($query);
             })
-            ->orderBy($this->sortBy, $this->sortDirection)
+            ->when(
+                $sortBy === 'role',
+                fn ($query) => $query->orderBy(
+                    Role::query()
+                        ->select('roles.name')
+                        ->join('role_user', 'role_user.role_id', '=', 'roles.id')
+                        ->whereColumn('role_user.user_id', 'users.id')
+                        ->orderBy('roles.name')
+                        ->limit(1),
+                    $sortDirection
+                ),
+                fn ($query) => $query->orderBy("users.{$sortBy}", $sortDirection)
+            )
+            ->orderBy('users.id')
             ->paginate($this->perPage);
 
         return view('livewire.user.index-user', [

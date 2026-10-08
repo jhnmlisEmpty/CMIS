@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Role;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Carbon\CarbonInterface;
@@ -24,7 +25,10 @@ class MemberListExportController extends Controller
         $birthdateTo = trim((string) $request->query('birthdateTo', ''));
         $minAge = trim((string) $request->query('minAge', ''));
         $maxAge = trim((string) $request->query('maxAge', ''));
-        $sortBy = $request->query('sortBy', 'created_at');
+        $requestedSort = (string) $request->query('sortBy', 'created_at');
+        $sortBy = in_array($requestedSort, ['created_at', 'name', 'role'], true)
+            ? $requestedSort
+            : 'created_at';
         $sortDirection = strtolower((string) $request->query('sortDirection', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $users = User::query()
@@ -71,7 +75,20 @@ class MemberListExportController extends Controller
                     $query->whereRaw($this->ageSqlExpression().' <= ?', [(int) $maxAge]);
                 }
             })
-            ->orderBy($sortBy, $sortDirection);
+            ->when(
+                $sortBy === 'role',
+                fn ($query) => $query->orderBy(
+                    Role::query()
+                        ->select('roles.name')
+                        ->join('role_user', 'role_user.role_id', '=', 'roles.id')
+                        ->whereColumn('role_user.user_id', 'users.id')
+                        ->orderBy('roles.name')
+                        ->limit(1),
+                    $sortDirection
+                ),
+                fn ($query) => $query->orderBy("users.{$sortBy}", $sortDirection)
+            )
+            ->orderBy('users.id');
 
         $audit->log('exported', 'members', 'Member list exported', null, [], $request->query());
 
