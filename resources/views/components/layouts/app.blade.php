@@ -78,14 +78,14 @@
     <main id="main-content" class="app-main" tabindex="-1"><div class="page-content">{{ $slot }}</div></main>
     @if($hasWorkspaceAccess)
     <nav class="mobile-nav" aria-label="Mobile navigation">
-        @can('dashboard.view')<a href="{{ route('home') }}" class="{{ request()->routeIs('home') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-squares-2x2 /><span>Overview</span></a>@endcan
-        @can('analytics.view')<a href="{{ route('analytics.index') }}" class="{{ request()->routeIs('analytics.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-chart-bar /><span>Analytics</span></a>@endcan
-        @can('events.view')<a href="{{ route('events.index') }}" class="{{ request()->routeIs('events.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-calendar-days /><span>Events</span></a>@endcan
-        @can('small_groups.view')<a href="{{ route('small-groups.index') }}" class="{{ request()->routeIs('small-groups.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-user-group /><span>Groups</span></a>@endcan
-        @can('lessons.view')<a href="{{ route('lessons.index') }}" class="{{ request()->routeIs('lessons.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-book-open /><span>Lessons</span></a>@endcan
-        @can('users.view')<a href="{{ route('users.index') }}" class="{{ request()->routeIs('users.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-user-group /><span>Members</span></a>@endcan
-        @can('access-control.manage')<a href="{{ route('settings.profile') }}" class="{{ request()->routeIs('settings.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-cog-6-tooth /><span>Settings</span></a>@endcan
-        <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit"><x-heroicon-o-arrow-left-start-on-rectangle /><span>Sign out</span></button></form>
+        @can('dashboard.view')<a href="{{ route('home') }}" aria-label="Overview" title="Overview" class="{{ request()->routeIs('home') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-squares-2x2 /><span>Overview</span></a>@endcan
+        @can('analytics.view')<a href="{{ route('analytics.index') }}" aria-label="Analytics" title="Analytics" class="{{ request()->routeIs('analytics.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-chart-bar /><span>Analytics</span></a>@endcan
+        @can('events.view')<a href="{{ route('events.index') }}" aria-label="Events" title="Events" class="{{ request()->routeIs('events.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-calendar-days /><span>Events</span></a>@endcan
+        @can('small_groups.view')<a href="{{ route('small-groups.index') }}" aria-label="Groups" title="Groups" class="{{ request()->routeIs('small-groups.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-user-group /><span>Groups</span></a>@endcan
+        @can('lessons.view')<a href="{{ route('lessons.index') }}" aria-label="Lessons" title="Lessons" class="{{ request()->routeIs('lessons.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-book-open /><span>Lessons</span></a>@endcan
+        @can('users.view')<a href="{{ route('users.index') }}" aria-label="Members" title="Members" class="{{ request()->routeIs('users.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-user-group /><span>Members</span></a>@endcan
+        @can('access-control.manage')<a href="{{ route('settings.profile') }}" aria-label="Settings" title="Settings" class="{{ request()->routeIs('settings.*') ? 'is-active' : '' }}" wire:navigate><x-heroicon-o-cog-6-tooth /><span>Settings</span></a>@endcan
+        <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" aria-label="Sign out" title="Sign out"><x-heroicon-o-arrow-left-start-on-rectangle /><span>Sign out</span></button></form>
     </nav>
     @endif
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>

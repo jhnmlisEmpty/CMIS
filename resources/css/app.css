@@ -1435,6 +1435,7 @@ main .font-mono, main [class*='text-2xl'], main [class*='text-3xl'] { font-varia
     .group-leader-options { grid-template-columns: 1fr; }
     .mobile-nav { position: fixed; right: .65rem; bottom: calc(.65rem + env(safe-area-inset-bottom)); left: .65rem; z-index: 50; min-height: 4rem; display: grid; grid-template-columns: repeat(5, 1fr); padding: .35rem; background: rgb(23 63 53 / .96); border: 1px solid rgb(255 255 255 / .1); border-radius: 1rem; box-shadow: 0 14px 38px rgb(23 45 37 / .3); backdrop-filter: blur(14px); }
     .mobile-nav a, .mobile-nav button { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .18rem; min-width: 0; border: 0; border-radius: .7rem; color: #abc0b8; background: transparent; font: inherit; font-size: .57rem; font-weight: 700; text-decoration: none; cursor: pointer; }
+    .mobile-nav a span, .mobile-nav button span { display: none; }
     .mobile-nav a.is-active { color: var(--accent-dark); background: #e4eee8; }
     .mobile-nav svg { width: 1.05rem; height: 1.05rem; }
     main div.bg-white.border[class*='p-6'], main div.bg-white.border[class*='p-8'] { padding: 1.1rem; }
