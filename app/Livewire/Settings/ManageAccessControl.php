@@ -117,23 +117,30 @@ class ManageAccessControl extends Component
 
     public function togglePermission(string $permission): void
     {
+        $this->setPermissionEnabled($permission, ! isset($this->selectedPermissionScopes[$this->stateKey($permission)]));
+    }
+
+    public function setPermissionEnabled(string $permission, bool $enabled): void
+    {
         Gate::authorize('access-control.manage');
         abort_unless(in_array($permission, PermissionRegistry::keys(), true), 422);
         $this->beginPermissionChange();
 
-        if (isset($this->selectedPermissionScopes[$permission])) {
-            unset($this->selectedPermissionScopes[$permission]);
+        $permissionKey = $this->stateKey($permission);
+        if (! $enabled) {
+            unset($this->selectedPermissionScopes[$permissionKey]);
         } else {
             $root = PermissionRegistry::scopeRootFor($permission);
-            if ($root && ! isset($this->selectedPermissionScopes[$root])) {
-                $this->selectedPermissionScopes[$root] = PermissionRegistry::SCOPE_ASSOCIATED;
+            $rootKey = $root ? $this->stateKey($root) : null;
+            if ($rootKey && ! isset($this->selectedPermissionScopes[$rootKey])) {
+                $this->selectedPermissionScopes[$rootKey] = PermissionRegistry::SCOPE_ASSOCIATED;
             }
-            $this->selectedPermissionScopes[$permission] = $root
-                ? $this->selectedPermissionScopes[$root]
+            $this->selectedPermissionScopes[$permissionKey] = $rootKey
+                ? $this->selectedPermissionScopes[$rootKey]
                 : PermissionRegistry::SCOPE_ALL;
         }
 
-        $this->selectedPermissions = array_keys($this->selectedPermissionScopes);
+        $this->selectedPermissions = array_keys($this->draftPermissionScopes());
         $this->syncPermissionScopeInputs();
         $this->refreshPermissionPreview();
     }
@@ -152,17 +159,18 @@ class ManageAccessControl extends Component
 
         if ($scope === 'none') {
             foreach (PermissionRegistry::scopeFamily($permission) as $relatedPermission) {
-                unset($this->selectedPermissionScopes[$relatedPermission]);
+                unset($this->selectedPermissionScopes[$this->stateKey($relatedPermission)]);
             }
         } else {
             foreach (PermissionRegistry::scopeFamily($permission) as $relatedPermission) {
-                if ($relatedPermission === $permission || isset($this->selectedPermissionScopes[$relatedPermission])) {
-                    $this->selectedPermissionScopes[$relatedPermission] = $scope;
+                $relatedKey = $this->stateKey($relatedPermission);
+                if ($relatedPermission === $permission || isset($this->selectedPermissionScopes[$relatedKey])) {
+                    $this->selectedPermissionScopes[$relatedKey] = $scope;
                 }
             }
         }
 
-        $this->selectedPermissions = array_keys($this->selectedPermissionScopes);
+        $this->selectedPermissions = array_keys($this->draftPermissionScopes());
         $this->syncPermissionScopeInputs();
         $this->refreshPermissionPreview();
     }
@@ -175,7 +183,7 @@ class ManageAccessControl extends Component
         $role = $this->selectedRole();
         abort_if($role->slug === Role::ADMIN, 422, 'Admin always has full access and does not need configurable permissions.');
 
-        $resolution = $resolver->resolve($this->selectedPermissionScopes);
+        $resolution = $resolver->resolve($this->draftPermissionScopes());
         $this->setPermissionPreview($resolution->adjustments);
         if ($resolution->hasAdjustments()) {
             $this->showPermissionConfirmation = true;
@@ -198,7 +206,7 @@ class ManageAccessControl extends Component
         $role = $this->selectedRole();
         abort_if($role->slug === Role::ADMIN, 422, 'Admin always has full access and does not need configurable permissions.');
 
-        $resolution = $resolver->resolve($this->selectedPermissionScopes);
+        $resolution = $resolver->resolve($this->draftPermissionScopes());
         $this->setPermissionPreview($resolution->adjustments);
         $this->persistPermissions($resolution->effective, $audit);
     }
@@ -328,7 +336,7 @@ class ManageAccessControl extends Component
                 $lockedRole->increment('permissions_version');
                 $lockedRole->touch();
                 $audit->log('updated', 'access_control', 'Permissions updated for '.$lockedRole->name, $lockedRole, ['permissions' => $previous], [
-                    'requested_permissions' => $this->selectedPermissionScopes,
+                    'requested_permissions' => $this->draftPermissionScopes(),
                     'effective_permissions' => $permissions,
                     'automatic_adjustments' => $this->permissionAdjustments,
                 ]);
@@ -348,7 +356,7 @@ class ManageAccessControl extends Component
             return;
         }
 
-        $this->selectedPermissionScopes = $permissions;
+        $this->setDraftPermissionScopes($permissions);
         $this->selectedPermissions = array_keys($permissions);
         $this->syncPermissionScopeInputs();
         $this->permissionsDirty = false;
@@ -376,10 +384,11 @@ class ManageAccessControl extends Component
         $savedPermissions = $role?->permissions()->get(['permission', 'access_scope'])->mapWithKeys(
             fn (RolePermission $item): array => [$item->permission => $item->access_scope],
         )->all() ?? [];
-        $this->selectedPermissionScopes = $role?->slug === Role::ADMIN
+        $permissions = $role?->slug === Role::ADMIN
             ? array_fill_keys(PermissionRegistry::keys(), PermissionRegistry::SCOPE_ALL)
             : $this->canonicalizeDraftScopes($savedPermissions);
-        $this->selectedPermissions = array_keys($this->selectedPermissionScopes);
+        $this->setDraftPermissionScopes($permissions);
+        $this->selectedPermissions = array_keys($permissions);
         $this->loadedRoleVersion = $role ? $this->roleVersion($role) : null;
         $this->syncPermissionScopeInputs();
     }
@@ -396,7 +405,7 @@ class ManageAccessControl extends Component
 
     private function refreshPermissionPreview(): void
     {
-        $this->setPermissionPreview(app(PermissionResolver::class)->resolve($this->selectedPermissionScopes)->adjustments);
+        $this->setPermissionPreview(app(PermissionResolver::class)->resolve($this->draftPermissionScopes())->adjustments);
     }
 
     private function setPermissionPreview(array $adjustments): void
@@ -418,10 +427,42 @@ class ManageAccessControl extends Component
 
     private function syncPermissionScopeInputs(): void
     {
+        $permissions = $this->draftPermissionScopes();
         $this->permissionScopeInputs = collect(PermissionRegistry::SCOPEABLE)
             ->mapWithKeys(fn (string $permission): array => [
-                str_replace('.', '__', $permission) => $this->selectedPermissionScopes[$permission] ?? 'none',
+                $this->stateKey($permission) => $permissions[$permission] ?? 'none',
             ])->all();
+    }
+
+    /** @return array<string, string> */
+    private function draftPermissionScopes(): array
+    {
+        $permissions = [];
+        foreach ($this->selectedPermissionScopes as $key => $scope) {
+            if (! is_string($scope)) {
+                continue;
+            }
+
+            $permission = str_replace('__', '.', (string) $key);
+            if (in_array($permission, PermissionRegistry::keys(), true) && in_array($scope, PermissionRegistry::SCOPES, true)) {
+                $permissions[$permission] = $scope;
+            }
+        }
+
+        return $permissions;
+    }
+
+    /** @param array<string, string> $permissions */
+    private function setDraftPermissionScopes(array $permissions): void
+    {
+        $this->selectedPermissionScopes = collect($permissions)->mapWithKeys(
+            fn (string $scope, string $permission): array => [$this->stateKey($permission) => $scope],
+        )->all();
+    }
+
+    private function stateKey(string $permission): string
+    {
+        return str_replace('.', '__', $permission);
     }
 
     /** @param array<string, string> $permissions */

@@ -138,7 +138,7 @@ class AssociatedAccessControlTest extends TestCase
             ->set('permissionScopeInputs.users__view', PermissionRegistry::SCOPE_ASSOCIATED)
             ->call('togglePermission', 'users.update')
             ->assertSet('permissionScopeInputs.users__view', PermissionRegistry::SCOPE_ASSOCIATED)
-            ->assertSet('selectedPermissionScopes', fn (array $scopes): bool => ($scopes['users.update'] ?? null) === PermissionRegistry::SCOPE_ASSOCIATED)
+            ->assertSet('selectedPermissionScopes', fn (array $scopes): bool => ($scopes['users__update'] ?? null) === PermissionRegistry::SCOPE_ASSOCIATED)
             ->call('save')
             ->assertSet('permissionScopeInputs.users__view', PermissionRegistry::SCOPE_ASSOCIATED)
             ->assertHasNoErrors();
@@ -161,8 +161,8 @@ class AssociatedAccessControlTest extends TestCase
             ->call('togglePermission', 'users.update')
             ->call('togglePermission', 'users.delete')
             ->set('permissionScopeInputs.users__view', PermissionRegistry::SCOPE_ALL)
-            ->assertSet('selectedPermissionScopes', fn (array $scopes): bool => ($scopes['users.update'] ?? null) === PermissionRegistry::SCOPE_ALL
-                && ($scopes['users.delete'] ?? null) === PermissionRegistry::SCOPE_ALL)
+            ->assertSet('selectedPermissionScopes', fn (array $scopes): bool => ($scopes['users__update'] ?? null) === PermissionRegistry::SCOPE_ALL
+                && ($scopes['users__delete'] ?? null) === PermissionRegistry::SCOPE_ALL)
             ->call('save')
             ->assertHasNoErrors();
 
@@ -180,7 +180,7 @@ class AssociatedAccessControlTest extends TestCase
             ->set('permissionScopeInputs.users__view', PermissionRegistry::SCOPE_ASSOCIATED)
             ->call('togglePermission', 'users.update')
             ->set('permissionScopeInputs.users__view', 'none')
-            ->assertSet('selectedPermissionScopes', fn (array $scopes): bool => collect(array_keys($scopes))->filter(fn (string $permission): bool => str_starts_with($permission, 'users.'))->isEmpty())
+            ->assertSet('selectedPermissionScopes', fn (array $scopes): bool => collect(array_keys($scopes))->filter(fn (string $permission): bool => str_starts_with($permission, 'users__'))->isEmpty())
             ->call('save')
             ->assertHasNoErrors();
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Settings\ManageAccessControl;
+use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\User;
@@ -38,7 +39,7 @@ class AccessControlFeedbackTest extends TestCase
             ->set('selectedRoleId', $role->id)
             ->assertSet('permissionScopeInputs.users__view', 'all')
             ->assertSet('permissionScopeInputs.small_groups__view', 'associated')
-            ->assertSet('selectedPermissionScopes', fn (array $scopes): bool => ($scopes['group_members.add'] ?? null) === 'associated');
+            ->assertSet('selectedPermissionScopes', fn (array $scopes): bool => ($scopes['group_members__add'] ?? null) === 'associated');
     }
 
     public function test_reducing_visibility_explains_removal_of_add_members_and_persists(): void
@@ -50,7 +51,7 @@ class AccessControlFeedbackTest extends TestCase
             ->call('togglePermission', 'group_members.add')
             ->set('permissionScopeInputs.users__view', 'associated')
             ->assertSet('permissionScopeInputs.users__view', 'associated')
-            ->assertSet('selectedPermissionScopes', fn (array $scopes): bool => ($scopes['group_members.add'] ?? null) === 'associated')
+            ->assertSet('selectedPermissionScopes', fn (array $scopes): bool => ($scopes['group_members__add'] ?? null) === 'associated')
             ->assertSee('View members will change from Associated only to All records')
             ->call('togglePermission', 'group_members.add')
             ->call('save')->assertHasNoErrors();
@@ -80,5 +81,35 @@ class AccessControlFeedbackTest extends TestCase
 
         $this->assertDatabaseHas('role_permissions', ['role_id' => $role->id, 'permission' => 'users.view', 'access_scope' => 'associated']);
         $this->assertDatabaseMissing('role_permissions', ['role_id' => $role->id, 'permission' => 'users.view', 'access_scope' => 'all']);
+    }
+
+    public function test_checked_permissions_do_not_revert_during_later_interactions(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $role = Role::where('slug', Role::PASTOR)->firstOrFail();
+
+        Livewire::actingAs($admin)->test(ManageAccessControl::class)
+            ->set('selectedRoleId', $role->id)
+            ->call('setPermissionEnabled', 'events.view', true)
+            ->call('setPermissionEnabled', 'events.view', true)
+            ->call('togglePermission', 'lessons.view')
+            ->call('togglePermission', 'dashboard.view')
+            ->call('togglePermission', 'events.create')
+            ->call('togglePermission', 'lessons.update')
+            ->assertSet('selectedPermissions', fn (array $permissions): bool => collect([
+                'events.view', 'lessons.view', 'dashboard.view', 'events.create', 'lessons.update',
+            ])->every(fn (string $permission): bool => in_array($permission, $permissions, true)))
+            ->assertSet('selectedPermissionScopes', fn (array $scopes): bool => collect(array_keys($scopes))->every(
+                fn (string $key): bool => ! str_contains($key, '.'),
+            ))
+            ->call('save')
+            ->assertHasNoErrors();
+
+        foreach (['events.view', 'lessons.view', 'dashboard.view', 'events.create', 'lessons.update'] as $permission) {
+            $this->assertDatabaseHas('role_permissions', ['role_id' => $role->id, 'permission' => $permission]);
+        }
+
+        $requested = AuditLog::where('module', 'access_control')->latest('id')->firstOrFail()->new_values['requested_permissions'];
+        $this->assertTrue(collect($requested)->every(fn ($scope): bool => is_string($scope)));
     }
 }
